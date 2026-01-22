@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Global Market Dashboard</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -23,7 +23,6 @@ body{
   padding:20px;
   width:520px;
 }
-h2{margin-top:0}
 .row{
   display:flex;
   justify-content:space-between;
@@ -32,6 +31,7 @@ h2{margin-top:0}
   cursor:pointer;
 }
 .row:hover{background:#020617}
+small{color:#94a3b8}
 input,button{
   background:#020617;
   border:1px solid #1f2937;
@@ -39,7 +39,6 @@ input,button{
   padding:8px;
   border-radius:10px;
 }
-small{color:#94a3b8}
 canvas{margin-top:15px}
 </style>
 </head>
@@ -48,11 +47,11 @@ canvas{margin-top:15px}
 <div class="card">
 <h2>🌍 Global Market Dashboard</h2>
 
-<div class="row" onclick="loadChart('USDINR=X')">💵 USD → INR <span id="usd">...</span></div>
-<div class="row" onclick="loadChart('XAUUSD=X')">🟨 Gold ₹/gram <span id="gold">...</span></div>
-<div class="row" onclick="loadChart('XAGUSD=X')">🪙 Silver ₹/kg <span id="silver">...</span></div>
-<div class="row" onclick="loadChart('HG=F')">🟫 Copper ₹/kg <span id="copper">...</span></div>
-<div class="row" onclick="loadChart('CL=F')">🛢 Crude ₹/litre <span id="crude">...</span></div>
+<div class="row">💵 USD → INR <span id="usd">loading...</span></div>
+<div class="row">🟨 Gold <span id="gold">loading...</span></div>
+<div class="row">🪙 Silver <span id="silver">loading...</span></div>
+<div class="row">🟫 Copper <span id="copper">loading...</span></div>
+<div class="row">🛢 Crude Oil <span id="crude">loading...</span></div>
 
 <hr style="border-color:#1f2937">
 
@@ -62,89 +61,71 @@ canvas{margin-top:15px}
 
 <canvas id="chart" height="120"></canvas>
 
-<p><small>Click any asset to view chart • Auto refresh every 60s</small></p>
+<p><small>Auto refresh every 60 seconds</small></p>
 </div>
 
 <script>
-const ids = {
-  usd:"USDINR=X",
-  gold:"XAUUSD=X",
-  silver:"XAGUSD=X",
-  copper:"HG=F",
-  crude:"CL=F"
-};
-
 let alertTarget = null;
-let ctx = document.getElementById("chart");
-let chart = new Chart(ctx,{
-  type:"line",
-  data:{labels:[],datasets:[{data:[],borderWidth:2}]},
-  options:{plugins:{legend:{display:false}}}
-});
 
-async function yahoo(sym){
-  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1m&range=1d`);
-  const j = await r.json();
-  return j.chart.result[0].meta.regularMarketPrice;
-}
-
-async function price(sym){
-  try { return await yahoo(sym); }
-  catch { return null; }
+async function fetchJSON(url){
+  const r = await fetch(url);
+  return await r.json();
 }
 
 async function refresh(){
   try{
-    let usd = await price(ids.usd);
-    let gold = await price(ids.gold);
-    let silver = await price(ids.silver);
-    let copper = await price(ids.copper);
-    let crude = await price(ids.crude);
+    // USDINR
+    let fx = await fetchJSON("https://api.exchangerate.host/latest?base=USD&symbols=INR");
+    let usd = fx.rates.INR;
 
-    if(!usd) throw "API";
+    // Metals.live (free public JSON)
+    let metals = await fetchJSON("https://api.metals.live/v1/spot");
 
+    let gold = metals.find(x=>x[0]==="gold")[1];   // USD/oz
+    let silver = metals.find(x=>x[0]==="silver")[1];
+    let copper = metals.find(x=>x[0]==="copper")[1]; // USD/lb
+
+    // Crude (stooq proxy)
+    let crudeTxt = await fetch("https://stooq.com/q/l/?s=cl.f&i=d").then(r=>r.text());
+    let crude = parseFloat(crudeTxt.split("\n")[1].split(",")[4]);
+
+    // conversions
     let goldInr = (gold*usd)/31.1035;
     let silverInr = (silver*usd)*32.1507;
     let copperInr = (copper*usd)*2.20462;
     let crudeInr = (crude*usd)/159;
 
-    usdSpan.textContent = `₹${usd.toFixed(2)}`;
-    goldSpan.textContent = `₹${goldInr.toFixed(2)}`;
-    silverSpan.textContent = `₹${silverInr.toFixed(0)}`;
-    copperSpan.textContent = `₹${copperInr.toFixed(0)}`;
-    crudeSpan.textContent = `₹${crudeInr.toFixed(2)}`;
+    usd.textContent = `₹${usd.toFixed(2)}`;
+    gold.textContent = `$${gold.toFixed(2)}/oz → ₹${goldInr.toFixed(2)}/g`;
+    silver.textContent = `$${silver.toFixed(2)}/oz → ₹${silverInr.toFixed(0)}/kg`;
+    copper.textContent = `$${copper.toFixed(2)}/lb → ₹${copperInr.toFixed(0)}/kg`;
+    crude.textContent = `$${crude.toFixed(2)}/bbl → ₹${crudeInr.toFixed(2)}/L`;
+
+    localStorage.setItem("lastData", JSON.stringify({usd,gold,silver,copper,crude}));
 
     if(alertTarget && goldInr>=alertTarget){
       alert("🔔 Gold crossed ₹"+goldInr.toFixed(2));
       alertTarget=null;
-      alertStatus.innerHTML="<small>Alert triggered</small>";
     }
 
-  }catch{
-    document.body.innerHTML="<h2 style='color:red'>API temporarily blocked. Refresh page.</h2>";
+  }catch(e){
+    let cached = JSON.parse(localStorage.getItem("lastData")||"{}");
+    if(cached.usd){
+      usd.textContent = `₹${cached.usd.toFixed(2)} (cached)`;
+      gold.textContent = `$${cached.gold.toFixed(2)} (cached)`;
+      silver.textContent = `$${cached.silver.toFixed(2)} (cached)`;
+      copper.textContent = `$${cached.copper.toFixed(2)} (cached)`;
+      crude.textContent = `$${cached.crude.toFixed(2)} (cached)`;
+    }else{
+      document.body.innerHTML="<h2 style='color:red'>All APIs blocked temporarily. Try again later.</h2>";
+    }
   }
-}
-
-async function loadChart(sym){
-  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=5m&range=1d`);
-  const j = await r.json();
-  let t = j.chart.result[0].timestamp;
-  let p = j.chart.result[0].indicators.quote[0].close;
-  chart.data.labels = t.map(x=>new Date(x*1000).toLocaleTimeString());
-  chart.data.datasets[0].data = p;
-  chart.update();
 }
 
 function setAlert(){
   alertTarget=parseFloat(alertInput.value);
   alertStatus.innerHTML="<small>Alert set at ₹"+alertTarget+"</small>";
 }
-
-const usdSpan=usd;
-const goldSpan=gold;
-const silverSpan=silver;
-const copperSpan=copper;
-const crudeSpan=crude;
 
 refresh();
 setInterval(refresh,60000);
