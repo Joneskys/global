@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gold & USD Rates</title>
+<title>Global Rates</title>
 
 <style>
 body {
@@ -21,7 +21,7 @@ body {
   border:1px solid #1f2937;
   padding:20px;
   border-radius:16px;
-  width:340px;
+  width:360px;
   box-shadow:0 10px 30px rgba(0,0,0,0.4);
 }
 
@@ -33,7 +33,7 @@ h2 {
 .item {
   display:flex;
   justify-content:space-between;
-  margin:12px 0;
+  margin:14px 0;
   font-size:16px;
 }
 
@@ -77,26 +77,30 @@ h2 {
 <script>
 async function loadRates() {
   try {
-    // USD to INR
-    const fx = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=INR");
+    // USD to INR (CORS-safe)
+    const fx = await fetch("https://open.er-api.com/v6/latest/USD");
     const fxData = await fx.json();
     const usdInr = fxData.rates.INR;
 
-    // Gold price (XAU/USD)
-    const gold = await fetch("https://api.exchangerate.host/latest?base=XAU&symbols=USD");
+    // Gold price USD per ounce (CORS-safe public endpoint)
+    const gold = await fetch("https://api.gold-api.com/price/XAU");
     const goldData = await gold.json();
-    const goldPerOunceUsd = goldData.rates.USD;
+    const goldPerOunceUsd = goldData.price;
 
     // Convert to INR per gram
     const goldPerGramInr = (goldPerOunceUsd * usdInr) / 31.1035;
 
-    // Display
     document.getElementById("usdInr").textContent = `₹ ${usdInr.toFixed(2)}`;
     document.getElementById("goldUsd").textContent = `$ ${goldPerOunceUsd.toFixed(2)}`;
     document.getElementById("goldInr").textContent = `₹ ${goldPerGramInr.toFixed(2)}`;
 
   } catch (e) {
-    document.body.innerHTML = "Error loading data. Try again later.";
+    document.querySelector(".card").innerHTML = `
+      <h2>⚠️ Error</h2>
+      <p style="text-align:center;color:#f87171">
+        Unable to load live data.<br>
+        Check internet or try later.
+      </p>`;
   }
 }
 
