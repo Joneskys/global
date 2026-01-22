@@ -19,7 +19,7 @@ body{
   border:1px solid #1f2937;
   border-radius:20px;
   padding:20px;
-  width:560px;
+  width:520px;
 }
 .row{
   display:flex;
@@ -42,11 +42,11 @@ input,button{
 <div class="card">
 <h2>🌍 Global Market Dashboard</h2>
 
-<div class="row">💵 USD → INR <span id="usd">...</span></div>
-<div class="row">🟨 Gold <span id="gold">...</span></div>
-<div class="row">🪙 Silver <span id="silver">...</span></div>
-<div class="row">🟫 Copper <span id="copper">...</span></div>
-<div class="row">🛢 Crude Oil <span id="crude">...</span></div>
+<div class="row">💵 USD → INR <span id="usd">Loading...</span></div>
+<div class="row">🟨 Gold <span id="gold">Loading...</span></div>
+<div class="row">🪙 Silver <span id="silver">Loading...</span></div>
+<div class="row">🟫 Copper <span id="copper">Loading...</span></div>
+<div class="row">🛢 Crude Oil <span id="crude">Loading...</span></div>
 
 <hr style="border-color:#1f2937">
 
@@ -58,56 +58,57 @@ input,button{
 </div>
 
 <script>
-const WORKER = "https://red-tooth-e4f7.lovelyideas-in.workers.dev?url=";
+const WORKER = "https://red-tooth-e4f7.lovelyideas-in.workers.dev?symbol=";
+
 let alertTarget = null;
 
-async function get(sym){
-  let r = await fetch(WORKER + encodeURIComponent(
-    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1m&range=1d`
-  ));
-  let j = await r.json();
+async function getPrice(symbol){
+  const r = await fetch(WORKER + symbol);
+  const j = await r.json();
   return j.chart.result[0].meta.regularMarketPrice;
 }
 
 async function refresh(){
   try{
-    let usd = await get("USDINR=X");
-    let gold = await get("XAUUSD=X");
-    let silver = await get("XAGUSD=X");
-    let copper = await get("HG=F");      // per lb
-    let crude = await get("CL=F");       // per barrel
+    const usd = await getPrice("USDINR=X");
+    const gold = await getPrice("XAUUSD=X");
+    const silver = await getPrice("XAGUSD=X");
+    const copper = await getPrice("HG=F");   // per pound
+    const crude = await getPrice("CL=F");    // per barrel
 
-    let goldInr = (gold*usd)/31.1035;
-    let silverInr = (silver*usd)*32.1507;
-    let copperInr = (copper*usd)*2.20462;
-    let crudeInr = (crude*usd)/159;
+    // conversions
+    const goldInr = (gold * usd) / 31.1035;              // ₹/gram
+    const silverInr = (silver * usd) * 32.1507;          // ₹/kg
+    const copperInr = (copper * usd) * 2.20462;          // ₹/kg
+    const crudeInr = (crude * usd) / 159;                // ₹/liter
 
-    usdSpan.textContent = `₹${usd.toFixed(2)}`;
-    goldSpan.textContent = `$${gold.toFixed(2)}/oz → ₹${goldInr.toFixed(2)}/g`;
-    silverSpan.textContent = `$${silver.toFixed(2)}/oz → ₹${silverInr.toFixed(0)}/kg`;
-    copperSpan.textContent = `$${copper.toFixed(2)}/lb → ₹${copperInr.toFixed(0)}/kg`;
-    crudeSpan.textContent = `$${crude.toFixed(2)}/bbl → ₹${crudeInr.toFixed(2)}/L`;
+    usd.innerHTML = `₹${usd.toFixed(2)}`;
+    goldSpan.innerHTML = `$${gold.toFixed(2)}/oz → ₹${goldInr.toFixed(2)}/g`;
+    silverSpan.innerHTML = `$${silver.toFixed(2)}/oz → ₹${silverInr.toFixed(0)}/kg`;
+    copperSpan.innerHTML = `$${copper.toFixed(2)}/lb → ₹${copperInr.toFixed(0)}/kg`;
+    crudeSpan.innerHTML = `$${crude.toFixed(2)}/bbl → ₹${crudeInr.toFixed(2)}/L`;
 
+    // alert
     if(alertTarget && goldInr >= alertTarget){
-      alert("🔔 Gold crossed ₹"+goldInr.toFixed(2));
-      alertTarget=null;
+      alert("🔔 Gold crossed ₹" + goldInr.toFixed(2));
+      alertTarget = null;
+      alertStatus.innerHTML = "<small>No alert set</small>";
     }
 
   }catch(e){
-    console.log("Error", e);
+    console.error(e);
   }
 }
 
 function setAlert(){
   alertTarget = parseFloat(alertInput.value);
-  alertStatus.innerHTML = "<small>Alert set at ₹"+alertTarget+"</small>";
+  alertStatus.innerHTML = "<small>Alert set at ₹" + alertTarget + "</small>";
 }
 
-const usdSpan = usd;
-const goldSpan = gold;
-const silverSpan = silver;
-const copperSpan = copper;
-const crudeSpan = crude;
+const goldSpan = document.getElementById("gold");
+const silverSpan = document.getElementById("silver");
+const copperSpan = document.getElementById("copper");
+const crudeSpan = document.getElementById("crude");
 
 refresh();
 setInterval(refresh,60000);
