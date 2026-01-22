@@ -1,20 +1,46 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Global Commodities Dashboard</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Global Market Dashboard</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body{background:#020617;color:#e5e7eb;font-family:system-ui;display:flex;justify-content:center;padding:20px}
-.card{background:#0f172a;border:1px solid #1f2937;padding:20px;border-radius:16px;width:480px}
-.row{display:flex;justify-content:space-between;padding:6px 0;cursor:pointer}
+body{
+  background:#020617;
+  color:#e5e7eb;
+  font-family:system-ui;
+  display:flex;
+  justify-content:center;
+  padding:30px;
+}
+.card{
+  background:#0f172a;
+  border:1px solid #1f2937;
+  border-radius:20px;
+  padding:20px;
+  width:520px;
+}
+h2{margin-top:0}
+.row{
+  display:flex;
+  justify-content:space-between;
+  padding:10px;
+  border-radius:10px;
+  cursor:pointer;
+}
 .row:hover{background:#020617}
-input,button{background:#020617;border:1px solid #1f2937;color:#fff;padding:6px;border-radius:8px}
+input,button{
+  background:#020617;
+  border:1px solid #1f2937;
+  color:#fff;
+  padding:8px;
+  border-radius:10px;
+}
 small{color:#94a3b8}
-canvas{margin-top:10px}
+canvas{margin-top:15px}
 </style>
 </head>
 <body>
@@ -22,95 +48,106 @@ canvas{margin-top:10px}
 <div class="card">
 <h2>🌍 Global Market Dashboard</h2>
 
-<div class="row" onclick="loadChart('USDINR=X')">💵 USD → INR <span id="usdInr">...</span></div>
-<div class="row" onclick="loadChart('XAUUSD=X')">🟨 Gold (₹/g) <span id="gold">...</span></div>
-<div class="row" onclick="loadChart('XAGUSD=X')">🪙 Silver (₹/kg) <span id="silver">...</span></div>
-<div class="row" onclick="loadChart('HG=F')">🟫 Copper (₹/kg) <span id="copper">...</span></div>
-<div class="row" onclick="loadChart('CL=F')">🛢 Crude Oil (₹/L) <span id="crude">...</span></div>
+<div class="row" onclick="loadChart('USDINR=X')">💵 USD → INR <span id="usd">...</span></div>
+<div class="row" onclick="loadChart('XAUUSD=X')">🟨 Gold ₹/gram <span id="gold">...</span></div>
+<div class="row" onclick="loadChart('XAGUSD=X')">🪙 Silver ₹/kg <span id="silver">...</span></div>
+<div class="row" onclick="loadChart('HG=F')">🟫 Copper ₹/kg <span id="copper">...</span></div>
+<div class="row" onclick="loadChart('CL=F')">🛢 Crude ₹/litre <span id="crude">...</span></div>
 
 <hr style="border-color:#1f2937">
 
-<input id="alertPrice" placeholder="Gold alert ₹/gram">
+<input id="alertInput" placeholder="Gold alert ₹/gram">
 <button onclick="setAlert()">🔔 Set Gold Alert</button>
 <div id="alertStatus"><small>No alert set</small></div>
 
-<canvas id="chart" height="140"></canvas>
+<canvas id="chart" height="120"></canvas>
 
 <p><small>Click any asset to view chart • Auto refresh every 60s</small></p>
 </div>
 
 <script>
-const symbols={
- usd:"USDINR=X",
- gold:"XAUUSD=X",
- silver:"XAGUSD=X",
- copper:"HG=F",
- crude:"CL=F"
+const ids = {
+  usd:"USDINR=X",
+  gold:"XAUUSD=X",
+  silver:"XAGUSD=X",
+  copper:"HG=F",
+  crude:"CL=F"
 };
 
-let prices={},alertTarget=null;
+let alertTarget = null;
+let ctx = document.getElementById("chart");
+let chart = new Chart(ctx,{
+  type:"line",
+  data:{labels:[],datasets:[{data:[],borderWidth:2}]},
+  options:{plugins:{legend:{display:false}}}
+});
 
-async function fetchPrice(sym){
- const url=`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1m&range=1d`;
- const j=await (await fetch(url)).json();
- return j.chart.result[0].meta.regularMarketPrice;
+async function yahoo(sym){
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1m&range=1d`);
+  const j = await r.json();
+  return j.chart.result[0].meta.regularMarketPrice;
+}
+
+async function price(sym){
+  try { return await yahoo(sym); }
+  catch { return null; }
 }
 
 async function refresh(){
- try{
-  let usd=await fetchPrice(symbols.usd);
-  let gold=await fetchPrice(symbols.gold);
-  let silver=await fetchPrice(symbols.silver);
-  let copper=await fetchPrice(symbols.copper);
-  let crude=await fetchPrice(symbols.crude);
+  try{
+    let usd = await price(ids.usd);
+    let gold = await price(ids.gold);
+    let silver = await price(ids.silver);
+    let copper = await price(ids.copper);
+    let crude = await price(ids.crude);
 
-  let goldInr=(gold*usd)/31.1035;
-  let silverInr=(silver*usd)*32.1507;
-  let copperInr=(copper*usd)*2.20462;
-  let crudeInr=(crude*usd)/159;
+    if(!usd) throw "API";
 
-  usdInr.textContent=`₹${usd.toFixed(2)}`;
-  gold.textContent=`₹${goldInr.toFixed(2)}`;
-  silver.textContent=`₹${silverInr.toFixed(0)}`;
-  copper.textContent=`₹${copperInr.toFixed(0)}`;
-  crude.textContent=`₹${crudeInr.toFixed(2)}`;
+    let goldInr = (gold*usd)/31.1035;
+    let silverInr = (silver*usd)*32.1507;
+    let copperInr = (copper*usd)*2.20462;
+    let crudeInr = (crude*usd)/159;
 
-  if(alertTarget && goldInr>=alertTarget){
-    alert("🔔 Gold Alert Hit ₹"+goldInr.toFixed(2));
-    alertTarget=null;
+    usdSpan.textContent = `₹${usd.toFixed(2)}`;
+    goldSpan.textContent = `₹${goldInr.toFixed(2)}`;
+    silverSpan.textContent = `₹${silverInr.toFixed(0)}`;
+    copperSpan.textContent = `₹${copperInr.toFixed(0)}`;
+    crudeSpan.textContent = `₹${crudeInr.toFixed(2)}`;
+
+    if(alertTarget && goldInr>=alertTarget){
+      alert("🔔 Gold crossed ₹"+goldInr.toFixed(2));
+      alertTarget=null;
+      alertStatus.innerHTML="<small>Alert triggered</small>";
+    }
+
+  }catch{
+    document.body.innerHTML="<h2 style='color:red'>API temporarily blocked. Refresh page.</h2>";
   }
+}
 
- }catch(e){
-  document.body.innerHTML="<h2 style='color:red'>API blocked temporarily. Refresh page.</h2>";
- }
+async function loadChart(sym){
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=5m&range=1d`);
+  const j = await r.json();
+  let t = j.chart.result[0].timestamp;
+  let p = j.chart.result[0].indicators.quote[0].close;
+  chart.data.labels = t.map(x=>new Date(x*1000).toLocaleTimeString());
+  chart.data.datasets[0].data = p;
+  chart.update();
 }
 
 function setAlert(){
- alertTarget=parseFloat(alertPrice.value);
- alertStatus.innerHTML="<small>Alert set at ₹"+alertTarget+"</small>";
+  alertTarget=parseFloat(alertInput.value);
+  alertStatus.innerHTML="<small>Alert set at ₹"+alertTarget+"</small>";
 }
 
-let chart=new Chart(chartCtx,{
- type:"line",
- data:{labels:[],datasets:[{data:[],borderWidth:2}]},
- options:{responsive:true,plugins:{legend:{display:false}}}
-});
-
-async function loadChart(sym){
- const url=`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=5m&range=1d`;
- const j=await (await fetch(url)).json();
- let t=j.chart.result[0].timestamp;
- let p=j.chart.result[0].indicators.quote[0].close;
- chart.data.labels=t.map(x=>new Date(x*1000).toLocaleTimeString());
- chart.data.datasets[0].data=p;
- chart.update();
-}
-
-const chartCtx=document.getElementById("chart");
+const usdSpan=usd;
+const goldSpan=gold;
+const silverSpan=silver;
+const copperSpan=copper;
+const crudeSpan=crude;
 
 refresh();
 setInterval(refresh,60000);
 </script>
-
 </body>
 </html>
