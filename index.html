@@ -2,29 +2,29 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Global Dashboard</title>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+<title>Global Market Dashboard</title>
 <style>
-body{
-  background:#020617;color:#e5e7eb;font-family:system-ui;
-  display:flex;justify-content:center;padding:20px
+body {
+  background:#0b1220;
+  color:#e5e7eb;
+  font-family:Arial;
 }
-.card{
-  background:#0f172a;border:1px solid #1f2937;
-  border-radius:20px;padding:20px;width:650px
+.card {
+  background:#111827;
+  padding:20px;
+  border-radius:15px;
+  max-width:900px;
+  margin:20px auto;
+  box-shadow:0 0 20px #000;
 }
-.row{display:flex;justify-content:space-between;padding:6px}
-small{color:#94a3b8}
-input,button{
-  background:#020617;border:1px solid #1f2937;
-  color:#fff;padding:8px;border-radius:10px
+.row {display:flex; justify-content:space-between; margin:10px 0;}
+button,input {
+  background:#1f2937; color:white; border:none;
+  padding:8px; border-radius:8px;
 }
-canvas{background:#020617;border-radius:12px;margin-top:10px}
-.green{color:#22c55e;font-weight:bold}
-.red{color:#ef4444;font-weight:bold}
+.green {color:#22c55e;}
+.red {color:#ef4444;}
+iframe {border-radius:12px;}
 </style>
 </head>
 <body>
@@ -32,106 +32,87 @@ canvas{background:#020617;border-radius:12px;margin-top:10px}
 <div class="card">
 <h2>🌍 Global Market Dashboard</h2>
 
-<div class="row">💵 USD → INR <span id="usd">...</span></div>
-<div class="row">🟨 Gold <span id="gold">...</span></div>
-<div class="row">🪙 Silver <span id="silver">...</span></div>
-<div class="row">🟫 Copper <span id="copper">...</span></div>
-<div class="row">🛢 Crude <span id="crude">...</span></div>
+<div id="usd"></div>
+<div id="gold"></div>
+<div id="silver"></div>
+<div id="copper"></div>
+<div id="crude"></div>
 
-<hr style="border-color:#1f2937">
+<h3>📈 Gold Chart</h3>
+<iframe src="https://s.tradingview.com/widgetembed/?symbol=OANDA:XAUUSD&interval=60&theme=dark" width="100%" height="250"></iframe>
 
-<h3>Indian ETFs / Stocks</h3>
-<div class="row">TATAGOLD <span id="tatagold">...</span></div>
-<div class="row">TATSILV <span id="tatsilv">...</span></div>
-<div class="row">HINDCOPPER <span id="hindcopper">...</span></div>
+<h3>📊 USDINR Chart</h3>
+<iframe src="https://s.tradingview.com/widgetembed/?symbol=FX_IDC:USDINR&interval=60&theme=dark" width="100%" height="250"></iframe>
 
-<hr style="border-color:#1f2937">
+<h3>🔔 Gold Price Alert</h3>
+<input id="alertPrice" placeholder="Gold price USD/oz">
+<button onclick="setAlert()">Set Alert</button>
+<p id="alertStatus"></p>
 
-<input id="alertInput" placeholder="Gold alert ₹/gram">
-<button onclick="setAlert()">🔔 Set Alert</button>
-<div id="alertStatus"><small>No alert</small></div>
+<h3>🇮🇳 Indian ETFs / Stocks</h3>
+<div id="stocks"></div>
 
-<canvas id="chart" height="120"></canvas>
+<h3>📲 Telegram Bot Alerts</h3>
+<p>Bot API format:</p>
+<code>
+https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage?chat_id=YOUR_CHAT_ID&text=Hello
+</code>
 
-<p><small>Auto refresh every 60s</small></p>
+<p>Use this URL in cron job / Windows scheduler at 9am,1pm,5pm</p>
 </div>
 
 <script>
-const W = "https://red-tooth-e4f7.lovelyideas-in.workers.dev?symbol=";
-let chart, alertTarget=null;
+let usdInr=0, gold=0;
 
-async function price(sym){
-  let r = await fetch(W+sym);
-  let j = await r.json();
-  return j.chart.result[0].meta.regularMarketPrice;
+async function loadData(){
+  // USD INR
+  let fx = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=INR").then(r=>r.json());
+  usdInr = fx.rates.INR;
+
+  // Metals prices
+  let metals = await fetch("https://api.metals.live/v1/spot").then(r=>r.json());
+
+  gold = metals.gold;
+  let silver = metals.silver;
+  let copper = metals.copper;
+  let crude = metals.oil;
+
+  document.getElementById("usd").innerHTML = `💱 USD → INR: <b>${usdInr.toFixed(2)}</b>`;
+  document.getElementById("gold").innerHTML = `🥇 Gold: $${gold} /oz`;
+  document.getElementById("silver").innerHTML = `🪙 Silver: ₹${((silver*usdInr)/31.103).toFixed(2)} per gram`;
+  document.getElementById("copper").innerHTML = `🔩 Copper: ₹${((copper*usdInr)/31.103).toFixed(2)} per gram`;
+  document.getElementById("crude").innerHTML = `🛢️ Crude: ₹${((crude*usdInr)/159).toFixed(2)} per litre`;
+
+  loadStocks();
 }
 
-async function history(sym){
-  let r = await fetch(W+sym+"&interval=5m&range=1d");
-  let j = await r.json();
-  return j.chart.result[0].indicators.quote[0].close.filter(x=>x);
+async function loadStocks(){
+  let symbols = ["TATAGOLD.NS","TATSILV.NS","HINDCOPPER.NS"];
+  let url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(",")}`;
+  let data = await fetch(url).then(r=>r.json());
+
+  let html="";
+  data.quoteResponse.result.forEach(s=>{
+    let nav = gold*usdInr/31.103; // approx fair value logic
+    let suggestion = s.regularMarketPrice < nav ? "<span class='green'>BUY</span>" : "<span class='red'>SELL</span>";
+    html += `<p>${s.symbol}: ₹${s.regularMarketPrice} → ${suggestion}</p>`;
+  });
+
+  document.getElementById("stocks").innerHTML = html;
 }
 
 function setAlert(){
-  alertTarget = parseFloat(alertInput.value);
-  alertStatus.innerHTML = "<small>Alert at ₹"+alertTarget+"</small>";
-}
-
-async function refresh(){
-  try{
-    const usd = await price("USDINR=X");
-    const gold = await price("XAUUSD=X");
-    const silver = await price("XAGUSD=X");
-    const copper = await price("HG=F");
-    const crude = await price("CL=F");
-
-    const goldInr = gold*usd/31.1035;
-    const silverInr = silver*usd/31.1035;
-    const copperInr = copper*usd/31.1035;
-    const crudeInr = crude*usd/159;
-
-    usd.innerHTML = `₹${usd.toFixed(2)}`;
-    goldSpan.innerHTML = `$${gold.toFixed(2)} → ₹${goldInr.toFixed(2)}/g`;
-    silverSpan.innerHTML = `$${silver.toFixed(2)} → ₹${silverInr.toFixed(2)}/g`;
-    copperSpan.innerHTML = `$${copper.toFixed(2)} → ₹${copperInr.toFixed(2)}/g`;
-    crudeSpan.innerHTML = `$${crude.toFixed(2)} → ₹${crudeInr.toFixed(2)}/L`;
-
-    const tg = await price("TATAGOLD.NS");
-    const ts = await price("TATSILV.NS");
-    const hc = await price("HINDCOPPER.NS");
-
-    tatagold.innerHTML = tg;
-    tatsilv.innerHTML = ts;
-    hindcopper.innerHTML = hc;
-
-    if(alertTarget && goldInr>=alertTarget){
-      alert("Gold crossed ₹"+goldInr.toFixed(2));
-      alertTarget=null;
+  let target = parseFloat(document.getElementById("alertPrice").value);
+  document.getElementById("alertStatus").innerText = "Alert Active";
+  setInterval(()=>{
+    if(gold >= target){
+      alert("Gold crossed "+target);
     }
-
-    const data = await history("XAUUSD=X");
-    draw(data);
-
-  }catch(e){console.log(e)}
+  },10000);
 }
 
-function draw(data){
-  if(chart) chart.destroy();
-  chart = new Chart(chartEl,{
-    type:'line',
-    data:{labels:data.map((_,i)=>i),
-      datasets:[{data,borderColor:'#facc15',borderWidth:2,pointRadius:0}]
-    },
-    options:{plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}}}
-  });
-}
-
-const usdSpan=usd,goldSpan=gold,silverSpan=silver,copperSpan=copper,crudeSpan=crude;
-const chartEl=document.getElementById("chart");
-
-refresh();
-setInterval(refresh,60000);
+loadData();
+setInterval(loadData,60000);
 </script>
-
 </body>
 </html>
