@@ -27,7 +27,22 @@ const API = "https://red-tooth-e4f7.lovelyideas-in.workers.dev?symbol=";
 async function fetchData(symbol) {
   const res = await fetch(API + symbol);
   const json = await res.json();
-  return json.data || json; 
+
+  const result = json.chart.result[0];
+  const timestamps = result.timestamp;
+  const quote = result.indicators.quote[0];
+
+  // Convert to usable candle objects
+  const data = timestamps.map((t, i) => ({
+    date: new Date(t * 1000),
+    open: quote.open[i],
+    high: quote.high[i],
+    low: quote.low[i],
+    close: quote.close[i],
+    volume: quote.volume[i]
+  })).filter(c => c.close !== null);
+
+  return data;
 }
 
 function ema(values, period) {
@@ -42,11 +57,9 @@ function ema(values, period) {
 }
 
 function filterByDate(data, from, to) {
-  if (!from && !to) return data;
   return data.filter(d => {
-    const dt = new Date(d.date);
-    if (from && dt < new Date(from)) return false;
-    if (to && dt > new Date(to)) return false;
+    if (from && d.date < new Date(from)) return false;
+    if (to && d.date > new Date(to)) return false;
     return true;
   });
 }
@@ -60,37 +73,39 @@ async function run() {
   try {
     let raw = await fetchData(stock);
 
-    // Expected format:
-    // [{ date, open, high, low, close, volume }]
-    let from = document.getElementById("from").value;
-    let to = document.getElementById("to").value;
+    const from = document.getElementById("from").value;
+    const to = document.getElementById("to").value;
 
-    let data = filterByDate(raw, from, to);
+    const data = filterByDate(raw, from, to);
 
-    let closes = data.map(d => Number(d.close));
-    let volumes = data.map(d => Number(d.volume));
+    const closes = data.map(d => d.close);
+    const volumes = data.map(d => d.volume);
 
-    let ema9 = ema(closes, 9);
-    let ema21 = ema(closes, 21);
+    const ema9 = ema(closes, 9);
+    const ema21 = ema(closes, 21);
 
     let trades = [];
     let wins = 0;
 
     for (let i = 21; i < closes.length - 1; i++) {
-      if (ema9[i-1] < ema21[i-1] && ema9[i] > ema21[i]) {
+      if (ema9[i - 1] < ema21[i - 1] && ema9[i] > ema21[i]) {
         let entry = closes[i];
-        let sl = entry - (entry * 0.005);
-        let target = entry + (entry * 0.01);
-        let result = closes[i+1] >= target ? "WIN" : "LOSS";
+        let sl = entry * 0.995;
+        let target = entry * 1.01;
+
+        let nextClose = closes[i + 1];
+        let result = nextClose >= target ? "WIN" : "LOSS";
+
         if (result === "WIN") wins++;
+
         trades.push({ entry, sl, target, result });
       }
     }
 
-    let trend = ema9.at(-1) > ema21.at(-1) ? "Bullish" : "Bearish";
-    let volumeStrength = volumes.at(-1) > volumes.at(-2) ? "High" : "Low";
-    let winRatio = trades.length ? ((wins / trades.length) * 100).toFixed(2) : 0;
-    let latest = trades.at(-1);
+    const trend = ema9.at(-1) > ema21.at(-1) ? "Bullish" : "Bearish";
+    const volumeStrength = volumes.at(-1) > volumes.at(-2) ? "High" : "Low";
+    const winRatio = trades.length ? ((wins / trades.length) * 100).toFixed(2) : 0;
+    const latest = trades.at(-1);
 
     document.getElementById("output").innerHTML = `
       <h3>${stock.toUpperCase()}</h3>
@@ -101,17 +116,17 @@ async function run() {
 
       <h4>Latest Signal</h4>
       ${latest ? `
-        Buy Zone: ₹${latest.entry.toFixed(2)}<br>
+        Buy Price: ₹${latest.entry.toFixed(2)}<br>
         Stop Loss: ₹${latest.sl.toFixed(2)}<br>
         Target: ₹${latest.target.toFixed(2)}
-      ` : "No signal"}
+      ` : "No recent signal"}
     `;
-
   } catch (e) {
-    document.getElementById("output").innerText = "API error or data format mismatch";
     console.error(e);
+    document.getElementById("output").innerText = "Still error — check console";
   }
 }
 </script>
+
 </body>
 </html>
