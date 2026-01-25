@@ -33,40 +33,67 @@
 <script>
 async function loadData() {
   try {
-    // USD to INR (CORS allowed)
+    // ---------- USD to INR ----------
     const forexRes = await fetch("https://open.er-api.com/v6/latest/USD");
     const forexData = await forexRes.json();
-    const usdInr = forexData.rates.INR;
+    const usdInr = forexData?.rates?.INR;
+
+    if (!usdInr) throw "Forex failed";
 
     document.getElementById("usdInr").innerText = usdInr.toFixed(2);
 
-    // Gold, Silver, Copper (CORS allowed)
+    // ---------- Metals ----------
     const metalsRes = await fetch("https://data-asg.goldprice.org/dbXRates/USD");
-    const metals = await metalsRes.json();
+    const metalsData = await metalsRes.json();
 
-    const gold = metals.items[0].xauPrice;
-    const silver = metals.items[0].xagPrice;
-    const copper = metals.items[0].xcuPrice;
+    const item = metalsData?.items?.[0];
+    if (!item) throw "Metals failed";
 
+    const gold = item.xauPrice;
+    const silver = item.xagPrice;
+    const copper = item.xcuPrice || null; // sometimes missing
+
+    // Show USD prices
     document.getElementById("goldUsd").innerText = "$" + gold.toFixed(2);
     document.getElementById("silverUsd").innerText = "$" + silver.toFixed(2);
-    document.getElementById("copperUsd").innerText = "$" + copper.toFixed(4);
 
-    // Conversions
+    if (copper) {
+      document.getElementById("copperUsd").innerText = "$" + copper.toFixed(4);
+    } else {
+      document.getElementById("copperUsd").innerText = "Not available";
+    }
+
+    // ---------- Conversions ----------
     const ounceToGram = 31.1035;
     const ounceToKg = 0.0311035;
 
     const goldInrGram = (gold / ounceToGram) * usdInr;
     const silverInrKg = (silver / ounceToKg) * usdInr;
-    const copperInrKg = (copper / ounceToKg) * usdInr;
 
     document.getElementById("goldInr").innerText = "₹" + goldInrGram.toFixed(2);
     document.getElementById("silverInr").innerText = "₹" + silverInrKg.toFixed(2);
-    document.getElementById("copperInr").innerText = "₹" + copperInrKg.toFixed(2);
 
-  } catch (err) {
-    console.error(err);
-    document.body.insertAdjacentHTML("beforeend", "<p style='color:red'>⚠ Failed to load data</p>");
+    if (copper) {
+      const copperInrKg = (copper / ounceToKg) * usdInr;
+      document.getElementById("copperInr").innerText = "₹" + copperInrKg.toFixed(2);
+    } else {
+      document.getElementById("copperInr").innerText = "Not available";
+    }
+
+    // Remove error message if success
+    const err = document.getElementById("err");
+    if (err) err.remove();
+
+  } catch (e) {
+    console.error(e);
+
+    if (!document.getElementById("err")) {
+      const p = document.createElement("p");
+      p.id = "err";
+      p.style.color = "red";
+      p.innerText = "⚠ Failed to load some data (API limitation)";
+      document.body.appendChild(p);
+    }
   }
 }
 
