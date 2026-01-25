@@ -4,9 +4,11 @@
   <title>Global Rates Dashboard</title>
   <style>
     body { font-family: Arial; background:#0f172a; color:white; padding:20px; }
-    .card { background:#1e293b; padding:15px; border-radius:12px; margin:10px 0; }
+    .card { background:#1e293b; padding:15px; border-radius:12px; margin:12px 0; }
     h1 { color:#38bdf8; }
     span { color:#22c55e; font-weight:bold; }
+    .sell { color:#f87171; font-weight:bold; }
+    .buy { color:#4ade80; font-weight:bold; }
   </style>
 </head>
 <body>
@@ -16,84 +18,84 @@
 <div class="card">💵 USD → INR: <span id="usdInr">Loading...</span></div>
 
 <div class="card">
-  🪙 Gold (USD / ounce): <span id="goldUsd">Loading...</span><br>
-  🇮🇳 Gold (INR / gram): <span id="goldInr">Loading...</span>
+  🪙 Gold USD/oz: <span id="goldUsd">...</span><br>
+  🇮🇳 Gold INR/g: <span id="goldInr">...</span>
 </div>
 
 <div class="card">
-  🥈 Silver (USD / ounce): <span id="silverUsd">Loading...</span><br>
-  🇮🇳 Silver (INR / Kg): <span id="silverInr">Loading...</span>
+  🥈 Silver USD/oz: <span id="silverUsd">...</span><br>
+  🇮🇳 Silver INR/kg: <span id="silverInr">...</span>
 </div>
 
 <div class="card">
-  🟫 Copper (USD / ounce): <span id="copperUsd">Loading...</span><br>
-  🇮🇳 Copper (INR / Kg): <span id="copperInr">Loading...</span>
+  🛢 Crude Oil USD/barrel: <span id="oilUsd">...</span><br>
+  🇮🇳 Crude Oil INR/liter: <span id="oilInr">...</span>
+</div>
+
+<div class="card">
+  📈 Indian Stocks (Live)<br><br>
+  TATAGOLD: <span id="tatagold"></span> (<span id="tatagoldSig"></span>)<br>
+  TATSILVER: <span id="tatsilver"></span> (<span id="tatsilverSig"></span>)<br>
+  HINDCOPPER: <span id="hindcopper"></span> (<span id="hindcopperSig"></span>)
 </div>
 
 <script>
 async function loadData() {
   try {
-    // ---------- USD to INR ----------
-    const forexRes = await fetch("https://open.er-api.com/v6/latest/USD");
-    const forexData = await forexRes.json();
-    const usdInr = forexData?.rates?.INR;
-
-    if (!usdInr) throw "Forex failed";
-
+    // USD → INR
+    const forex = await fetch("https://open.er-api.com/v6/latest/USD");
+    const forexData = await forex.json();
+    const usdInr = forexData.rates.INR;
     document.getElementById("usdInr").innerText = usdInr.toFixed(2);
 
-    // ---------- Metals ----------
+    // Metals
     const metalsRes = await fetch("https://data-asg.goldprice.org/dbXRates/USD");
-    const metalsData = await metalsRes.json();
+    const metals = await metalsRes.json();
+    const gold = metals.items[0].xauPrice;
+    const silver = metals.items[0].xagPrice;
 
-    const item = metalsData?.items?.[0];
-    if (!item) throw "Metals failed";
-
-    const gold = item.xauPrice;
-    const silver = item.xagPrice;
-    const copper = item.xcuPrice || null; // sometimes missing
-
-    // Show USD prices
     document.getElementById("goldUsd").innerText = "$" + gold.toFixed(2);
     document.getElementById("silverUsd").innerText = "$" + silver.toFixed(2);
 
-    if (copper) {
-      document.getElementById("copperUsd").innerText = "$" + copper.toFixed(4);
-    } else {
-      document.getElementById("copperUsd").innerText = "Not available";
-    }
-
-    // ---------- Conversions ----------
-    const ounceToGram = 31.1035;
-    const ounceToKg = 0.0311035;
-
-    const goldInrGram = (gold / ounceToGram) * usdInr;
-    const silverInrKg = (silver / ounceToKg) * usdInr;
+    const goldInrGram = (gold / 31.1035) * usdInr;
+    const silverInrKg = (silver / 0.0311035) * usdInr;
 
     document.getElementById("goldInr").innerText = "₹" + goldInrGram.toFixed(2);
     document.getElementById("silverInr").innerText = "₹" + silverInrKg.toFixed(2);
 
-    if (copper) {
-      const copperInrKg = (copper / ounceToKg) * usdInr;
-      document.getElementById("copperInr").innerText = "₹" + copperInrKg.toFixed(2);
-    } else {
-      document.getElementById("copperInr").innerText = "Not available";
-    }
+    // Crude Oil (Yahoo Finance proxy)
+    const oilRes = await fetch("https://query1.finance.yahoo.com/v7/finance/quote?symbols=CL=F");
+    const oilData = await oilRes.json();
+    const oilUsd = oilData.quoteResponse.result[0].regularMarketPrice;
+    document.getElementById("oilUsd").innerText = "$" + oilUsd.toFixed(2);
 
-    // Remove error message if success
-    const err = document.getElementById("err");
-    if (err) err.remove();
+    const oilInrLiter = (oilUsd * usdInr) / 158.987;
+    document.getElementById("oilInr").innerText = "₹" + oilInrLiter.toFixed(2);
+
+    // Stocks from Yahoo Finance NSE
+    await loadStock("TATAGOLD.NS", "tatagold", "tatagoldSig");
+    await loadStock("TATSILVER.NS", "tatsilver", "tatsilverSig");
+    await loadStock("HINDCOPPER.NS", "hindcopper", "hindcopperSig");
 
   } catch (e) {
     console.error(e);
+  }
+}
 
-    if (!document.getElementById("err")) {
-      const p = document.createElement("p");
-      p.id = "err";
-      p.style.color = "red";
-      p.innerText = "⚠ Failed to load some data (API limitation)";
-      document.body.appendChild(p);
-    }
+async function loadStock(symbol, priceId, sigId) {
+  const res = await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`);
+  const data = await res.json();
+  const stock = data.quoteResponse.result[0];
+
+  const price = stock.regularMarketPrice;
+  const prev = stock.regularMarketPreviousClose;
+
+  document.getElementById(priceId).innerText = "₹" + price.toFixed(2);
+
+  if (price > prev) {
+    document.getElementById(sigId).innerHTML = "<span class='buy'>BUY</span>";
+  } else {
+    document.getElementById(sigId).innerHTML = "<span class='sell'>SELL</span>";
   }
 }
 
