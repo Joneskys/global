@@ -38,26 +38,32 @@ td,th{padding:4px;}
 
 <script>
 const API = "https://red-tooth-e4f7.lovelyideas-in.workers.dev?symbol=";
-const WATCHLIST = ["SBIN","TCS","INFY","RELIANCE","ICICIBANK","HDFCBANK","ITC","LT","AXISBANK","HINDCOPPER"];
 
-let chart;
-
-async function fetchData(symbol){
-  const res = await fetch(API+symbol);
+async function fetchData(symbol, interval="5m", range="5d") {
+  const res = await fetch(`${API}${symbol}&interval=${interval}&range=${range}`);
   const json = await res.json();
+
   const r = json.chart.result[0];
   const q = r.indicators.quote[0];
+
   return r.timestamp.map((t,i)=>({
-    date:new Date(t*1000),
-    open:q.open[i], high:q.high[i], low:q.low[i],
-    close:q.close[i], volume:q.volume[i]
+    date: new Date(t*1000),
+    open:q.open[i],
+    high:q.high[i],
+    low:q.low[i],
+    close:q.close[i],
+    volume:q.volume[i]
   })).filter(x=>x.close);
 }
 
-function ema(values,p){
-  let k=2/(p+1), e=values[0], arr=[e];
+// === Indicators ===
+
+function ema(values, p) {
+  const k = 2/(p+1);
+  let e = values[0];
+  let arr = [e];
   for(let i=1;i<values.length;i++){
-    e=values[i]*k + e*(1-k);
+    e = values[i]*k + e*(1-k);
     arr.push(e);
   }
   return arr;
@@ -66,112 +72,112 @@ function ema(values,p){
 function rsi(closes, period=14){
   let gains=0, losses=0;
   for(let i=1;i<=period;i++){
-    let diff=closes[i]-closes[i-1];
-    diff>=0?gains+=diff:losses-=diff;
+    let diff = closes[i]-closes[i-1];
+    if(diff>=0) gains+=diff;
+    else losses-=diff;
   }
-  let rs=gains/losses;
-  return 100-(100/(1+rs));
-}
-
-function macd(closes){
-  let ema12=ema(closes,12);
-  let ema26=ema(closes,26);
-  let macdLine=ema12.map((v,i)=>v-ema26[i]);
-  let signal=ema(macdLine,9);
-  return {macd:macdLine.at(-1), signal:signal.at(-1)};
+  let rs = gains/losses;
+  return 100 - (100/(1+rs));
 }
 
 function vwap(data){
-  let cumPV=0, cumVol=0;
-  data.forEach(d=>{
-    let typical=(d.high+d.low+d.close)/3;
-    cumPV+=typical*d.volume;
-    cumVol+=d.volume;
+  let pv=0, vol=0;
+  data.forEach(c=>{
+    let tp=(c.high+c.low+c.close)/3;
+    pv += tp*c.volume;
+    vol += c.volume;
   });
-  return cumPV/cumVol;
+  return pv/vol;
 }
 
-function supportResistance(closes){
-  let min=Math.min(...closes.slice(-20));
-  let max=Math.max(...closes.slice(-20));
-  return {support:min, resistance:max};
+// === Backtest Engine ===
+
+function backtest(data){
+  const closes = data.map(d=>d.close);
+  const volumes = data.map(d=>d.volume);
+
+  const ema9 = ema(closes,9);
+  const ema21 = ema(closes,21);
+
+  let trades = [];
+  let equity = 0;
+  let peak = 0;
+  let maxDD = 0;
+
+  for(let i=25;i<data.length-5;i++){
+
+    const r = rsi(closes.slice(i-15,i+1));
+    const vw = vwap(data.slice(i-20,i+1));
+    const avgVol = volumes.slice(i-10,i).reduce((a,b)=>a+b)/10;
+
+    // === ENTRY CONDITION ===
+    if(
+      ema9[i-1] < ema21[i-1] &&
+      ema9[i] > ema21[i] &&
+      closes[i] > vw &&
+      r > 55 && r < 70 &&
+      volumes[i] > avgVol
+    ){
+      const entry = closes[i];
+      const sl = entry * 0.995;
+      const target = entry * 1.01;
+
+      let exit = closes[i+1];
+      let result = "LOSS";
+
+      for(let j=i+1;j<i+6;j++){
+        if(data[j].low <= sl){ exit = sl; result="LOSS"; break; }
+        if(data[j].high >= target){ exit = target; result="WIN"; break; }
+      }
+
+      let pnl = exit - entry;
+      equity += pnl;
+      peak = Math.max(peak, equity);
+      maxDD = Math.max(maxDD, peak - equity);
+
+      trades.push({entry, exit, result, pnl});
+    }
+  }
+
+  const wins = trades.filter(t=>t.result==="WIN").length;
+
+  return {
+    total: trades.length,
+    wins,
+    losses: trades.length - wins,
+    winRate: trades.length ? (wins/trades.length*100).toFixed(2) : 0,
+    net: equity.toFixed(2),
+    maxDD: maxDD.toFixed(2),
+    last: trades.at(-1)
+  };
 }
 
-function analyze(data){
-  let closes=data.map(d=>d.close);
-  let vols=data.map(d=>d.volume);
-  let e9=ema(closes,9), e21=ema(closes,21);
-
-  let trend=e9.at(-1)>e21.at(-1)?"Bullish":"Bearish";
-  let volumeStrength=vols.at(-1)>vols.slice(-10).reduce((a,b)=>a+b)/10?"High":"Low";
-
-  let r=rsi(closes);
-  let m=macd(closes);
-  let v=vwap(data);
-  let sr=supportResistance(closes);
-
-  let confidence=0;
-  if(trend==="Bullish") confidence+=30;
-  if(r>55 && r<70) confidence+=20;
-  if(m.macd>m.signal) confidence+=20;
-  if(closes.at(-1)>v) confidence+=15;
-  if(volumeStrength==="High") confidence+=15;
-
-  return {trend,volumeStrength,rsi:r,macd:m,vwap:v,sr,confidence,e9,e21};
-}
-
-function renderChart(data,e9,e21){
-  let labels=data.map(d=>d.date.toLocaleDateString());
-  let closes=data.map(d=>d.close);
-
-  if(chart) chart.destroy();
-  chart=new Chart(document.getElementById("chart"),{
-    type:'line',
-    data:{labels,
-      datasets:[
-        {label:"Close",data:closes,borderWidth:1},
-        {label:"EMA 9",data:e9,borderWidth:1},
-        {label:"EMA 21",data:e21,borderWidth:1}
-      ]}
-  });
-}
+// === UI ===
 
 async function run(){
-  let sym=document.getElementById("stock").value;
-  let data=await fetchData(sym);
-  let res=analyze(data);
-  renderChart(data,res.e9,res.e21);
+  document.getElementById("stats").innerHTML = "Loading backtest...";
 
-  document.getElementById("stats").innerHTML=`
-    <div class="metric">Trend: <b>${res.trend}</b></div>
-    <div class="metric">Volume: <b>${res.volumeStrength}</b></div>
-    <div class="metric">RSI: <b>${res.rsi.toFixed(2)}</b></div>
-    <div class="metric">MACD: <b>${res.macd.macd.toFixed(2)}</b></div>
-    <div class="metric">VWAP: ₹${res.vwap.toFixed(2)}</div>
-    <div class="metric green">Support: ₹${res.sr.support.toFixed(2)}</div>
-    <div class="metric red">Resistance: ₹${res.sr.resistance.toFixed(2)}</div>
+  const data = await fetchData("SBIN","5m","5d");
+  const result = backtest(data);
+
+  document.getElementById("stats").innerHTML = `
+    <h3>SBIN 5-min Strategy Backtest</h3>
+    <div>Total Trades: ${result.total}</div>
+    <div>Wins: ${result.wins}</div>
+    <div>Losses: ${result.losses}</div>
+    <div>Win Rate: ${result.winRate}%</div>
+    <div>Net P&L (points): ${result.net}</div>
+    <div>Max Drawdown: ${result.maxDD}</div>
     <hr>
-    <div class="metric yellow">🧠 AI Confidence Score: <b>${res.confidence}%</b></div>
+    <b>Latest Trade:</b><br>
+    Entry: ${result.last?.entry?.toFixed(2)}<br>
+    Exit: ${result.last?.exit?.toFixed(2)}<br>
+    Result: ${result.last?.result}
   `;
-}
-
-async function scan(){
-  let html="<table><tr><th>Stock</th><th>Trend</th><th>RSI</th><th>Score</th></tr>";
-  for(let s of WATCHLIST){
-    let d=await fetchData(s);
-    let r=analyze(d);
-    html+=`<tr>
-      <td>${s}</td>
-      <td>${r.trend}</td>
-      <td>${r.rsi.toFixed(0)}</td>
-      <td>${r.confidence}%</td>
-    </tr>`;
-  }
-  html+="</table>";
-  document.getElementById("scanner").innerHTML=html;
 }
 
 run();
 </script>
+
 </body>
 </html>
