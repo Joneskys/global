@@ -21,12 +21,6 @@ async function sendAlert() {
   const goldInr = (gold / 31.1035) * usdInr;
   const silverInr = (silver / 0.0311035) * usdInr;
 
-  // Crude oil
-  const oil = await fetch("https://query1.finance.yahoo.com/v7/finance/quote?symbols=CL=F");
-  const oilData = await oil.json();
-  const oilUsd = oilData.quoteResponse.result[0].regularMarketPrice;
-  const oilInr = (oilUsd * usdInr) / 158.987;
-
   // Message
   const msg = `
 📊 Market Alert
@@ -34,7 +28,6 @@ async function sendAlert() {
 💵 USD/INR: ${usdInr.toFixed(2)}
 🪙 Gold: ₹${goldInr.toFixed(2)} / g
 🥈 Silver: ₹${silverInr.toFixed(2)} / kg
-🛢 Crude: ₹${oilInr.toFixed(2)} / liter
 `;
 
   // Send to Telegram
