@@ -1,132 +1,177 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Live Stock EMA Strategy</title>
-  <style>
-    body { font-family: Arial; background: #f5f7fa; padding: 20px; }
-    input, button { padding: 8px; margin: 5px; }
-    .box { background: #fff; padding: 15px; border-radius: 10px; margin-top: 15px; }
-    .green { color: green; font-weight: bold; }
-    .red { color: red; font-weight: bold; }
-  </style>
+<title>Pro Trading Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body { background:#0f172a; color:#e2e8f0; font-family:Arial; margin:0; }
+header { background:#020617; padding:15px; font-size:20px; }
+.container { display:grid; grid-template-columns: 300px 1fr; gap:15px; padding:15px; }
+.panel { background:#020617; padding:15px; border-radius:12px; }
+input,button { width:100%; padding:8px; background:#1e293b; border:none; color:white; margin-bottom:8px; }
+button { background:#2563eb; cursor:pointer; }
+.metric { margin:6px 0; }
+.green{color:#22c55e;} .red{color:#ef4444;} .yellow{color:#facc15;}
+table{width:100%; font-size:13px;}
+td,th{padding:4px;}
+</style>
 </head>
 <body>
 
-<h2>📈 Live EMA Strategy + Backtest</h2>
+<header>📊 Pro Trading Dashboard v2</header>
 
-<input id="stock" placeholder="SBIN" />
-<input type="date" id="from">
-<input type="date" id="to">
-<button onclick="run()">Analyze</button>
+<div class="container">
+  <div class="panel">
+    <input id="stock" value="SBIN" />
+    <button onclick="run()">Analyze</button>
+    <div id="stats"></div>
 
-<div id="output" class="box">Waiting...</div>
+    <h4>📌 Multi Stock Scanner</h4>
+    <button onclick="scan()">Scan Market</button>
+    <div id="scanner"></div>
+  </div>
+
+  <div class="panel">
+    <canvas id="chart"></canvas>
+  </div>
+</div>
 
 <script>
 const API = "https://red-tooth-e4f7.lovelyideas-in.workers.dev?symbol=";
+const WATCHLIST = ["SBIN","TCS","INFY","RELIANCE","ICICIBANK","HDFCBANK","ITC","LT","AXISBANK","HINDCOPPER"];
 
-async function fetchData(symbol) {
-  const res = await fetch(API + symbol);
+let chart;
+
+async function fetchData(symbol){
+  const res = await fetch(API+symbol);
   const json = await res.json();
-
-  const result = json.chart.result[0];
-  const timestamps = result.timestamp;
-  const quote = result.indicators.quote[0];
-
-  // Convert to usable candle objects
-  const data = timestamps.map((t, i) => ({
-    date: new Date(t * 1000),
-    open: quote.open[i],
-    high: quote.high[i],
-    low: quote.low[i],
-    close: quote.close[i],
-    volume: quote.volume[i]
-  })).filter(c => c.close !== null);
-
-  return data;
+  const r = json.chart.result[0];
+  const q = r.indicators.quote[0];
+  return r.timestamp.map((t,i)=>({
+    date:new Date(t*1000),
+    open:q.open[i], high:q.high[i], low:q.low[i],
+    close:q.close[i], volume:q.volume[i]
+  })).filter(x=>x.close);
 }
 
-function ema(values, period) {
-  const k = 2 / (period + 1);
-  let ema = values[0];
-  let arr = [ema];
-  for (let i = 1; i < values.length; i++) {
-    ema = values[i] * k + ema * (1 - k);
-    arr.push(ema);
+function ema(values,p){
+  let k=2/(p+1), e=values[0], arr=[e];
+  for(let i=1;i<values.length;i++){
+    e=values[i]*k + e*(1-k);
+    arr.push(e);
   }
   return arr;
 }
 
-function filterByDate(data, from, to) {
-  return data.filter(d => {
-    if (from && d.date < new Date(from)) return false;
-    if (to && d.date > new Date(to)) return false;
-    return true;
+function rsi(closes, period=14){
+  let gains=0, losses=0;
+  for(let i=1;i<=period;i++){
+    let diff=closes[i]-closes[i-1];
+    diff>=0?gains+=diff:losses-=diff;
+  }
+  let rs=gains/losses;
+  return 100-(100/(1+rs));
+}
+
+function macd(closes){
+  let ema12=ema(closes,12);
+  let ema26=ema(closes,26);
+  let macdLine=ema12.map((v,i)=>v-ema26[i]);
+  let signal=ema(macdLine,9);
+  return {macd:macdLine.at(-1), signal:signal.at(-1)};
+}
+
+function vwap(data){
+  let cumPV=0, cumVol=0;
+  data.forEach(d=>{
+    let typical=(d.high+d.low+d.close)/3;
+    cumPV+=typical*d.volume;
+    cumVol+=d.volume;
+  });
+  return cumPV/cumVol;
+}
+
+function supportResistance(closes){
+  let min=Math.min(...closes.slice(-20));
+  let max=Math.max(...closes.slice(-20));
+  return {support:min, resistance:max};
+}
+
+function analyze(data){
+  let closes=data.map(d=>d.close);
+  let vols=data.map(d=>d.volume);
+  let e9=ema(closes,9), e21=ema(closes,21);
+
+  let trend=e9.at(-1)>e21.at(-1)?"Bullish":"Bearish";
+  let volumeStrength=vols.at(-1)>vols.slice(-10).reduce((a,b)=>a+b)/10?"High":"Low";
+
+  let r=rsi(closes);
+  let m=macd(closes);
+  let v=vwap(data);
+  let sr=supportResistance(closes);
+
+  let confidence=0;
+  if(trend==="Bullish") confidence+=30;
+  if(r>55 && r<70) confidence+=20;
+  if(m.macd>m.signal) confidence+=20;
+  if(closes.at(-1)>v) confidence+=15;
+  if(volumeStrength==="High") confidence+=15;
+
+  return {trend,volumeStrength,rsi:r,macd:m,vwap:v,sr,confidence,e9,e21};
+}
+
+function renderChart(data,e9,e21){
+  let labels=data.map(d=>d.date.toLocaleDateString());
+  let closes=data.map(d=>d.close);
+
+  if(chart) chart.destroy();
+  chart=new Chart(document.getElementById("chart"),{
+    type:'line',
+    data:{labels,
+      datasets:[
+        {label:"Close",data:closes,borderWidth:1},
+        {label:"EMA 9",data:e9,borderWidth:1},
+        {label:"EMA 21",data:e21,borderWidth:1}
+      ]}
   });
 }
 
-async function run() {
-  const stock = document.getElementById("stock").value.trim();
-  if (!stock) return alert("Enter stock name");
+async function run(){
+  let sym=document.getElementById("stock").value;
+  let data=await fetchData(sym);
+  let res=analyze(data);
+  renderChart(data,res.e9,res.e21);
 
-  document.getElementById("output").innerText = "Loading...";
-
-  try {
-    let raw = await fetchData(stock);
-
-    const from = document.getElementById("from").value;
-    const to = document.getElementById("to").value;
-
-    const data = filterByDate(raw, from, to);
-
-    const closes = data.map(d => d.close);
-    const volumes = data.map(d => d.volume);
-
-    const ema9 = ema(closes, 9);
-    const ema21 = ema(closes, 21);
-
-    let trades = [];
-    let wins = 0;
-
-    for (let i = 21; i < closes.length - 1; i++) {
-      if (ema9[i - 1] < ema21[i - 1] && ema9[i] > ema21[i]) {
-        let entry = closes[i];
-        let sl = entry * 0.995;
-        let target = entry * 1.01;
-
-        let nextClose = closes[i + 1];
-        let result = nextClose >= target ? "WIN" : "LOSS";
-
-        if (result === "WIN") wins++;
-
-        trades.push({ entry, sl, target, result });
-      }
-    }
-
-    const trend = ema9.at(-1) > ema21.at(-1) ? "Bullish" : "Bearish";
-    const volumeStrength = volumes.at(-1) > volumes.at(-2) ? "High" : "Low";
-    const winRatio = trades.length ? ((wins / trades.length) * 100).toFixed(2) : 0;
-    const latest = trades.at(-1);
-
-    document.getElementById("output").innerHTML = `
-      <h3>${stock.toUpperCase()}</h3>
-      <p>Trend: <b>${trend}</b></p>
-      <p>Volume: <b>${volumeStrength}</b></p>
-      <p>Total Trades: ${trades.length}</p>
-      <p>Win Ratio: <b>${winRatio}%</b></p>
-
-      <h4>Latest Signal</h4>
-      ${latest ? `
-        Buy Price: ₹${latest.entry.toFixed(2)}<br>
-        Stop Loss: ₹${latest.sl.toFixed(2)}<br>
-        Target: ₹${latest.target.toFixed(2)}
-      ` : "No recent signal"}
-    `;
-  } catch (e) {
-    console.error(e);
-    document.getElementById("output").innerText = "Still error — check console";
-  }
+  document.getElementById("stats").innerHTML=`
+    <div class="metric">Trend: <b>${res.trend}</b></div>
+    <div class="metric">Volume: <b>${res.volumeStrength}</b></div>
+    <div class="metric">RSI: <b>${res.rsi.toFixed(2)}</b></div>
+    <div class="metric">MACD: <b>${res.macd.macd.toFixed(2)}</b></div>
+    <div class="metric">VWAP: ₹${res.vwap.toFixed(2)}</div>
+    <div class="metric green">Support: ₹${res.sr.support.toFixed(2)}</div>
+    <div class="metric red">Resistance: ₹${res.sr.resistance.toFixed(2)}</div>
+    <hr>
+    <div class="metric yellow">🧠 AI Confidence Score: <b>${res.confidence}%</b></div>
+  `;
 }
-</script>
 
+async function scan(){
+  let html="<table><tr><th>Stock</th><th>Trend</th><th>RSI</th><th>Score</th></tr>";
+  for(let s of WATCHLIST){
+    let d=await fetchData(s);
+    let r=analyze(d);
+    html+=`<tr>
+      <td>${s}</td>
+      <td>${r.trend}</td>
+      <td>${r.rsi.toFixed(0)}</td>
+      <td>${r.confidence}%</td>
+    </tr>`;
+  }
+  html+="</table>";
+  document.getElementById("scanner").innerHTML=html;
+}
+
+run();
+</script>
 </body>
 </html>
