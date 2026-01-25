@@ -54,6 +54,30 @@ h1 {
   z-index: 1000;
 }
 
+/* 🔘 Buttons */
+.buttons {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
+
+.buttons a {
+  text-decoration: none;
+  background: #2563eb;
+  color: white;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: bold;
+  transition: 0.2s;
+}
+
+.buttons a:hover {
+  background: #1d4ed8;
+}
+
 .status-panel {
   position: fixed;
   right: 10px;
@@ -97,6 +121,15 @@ footer {
 <div class="container">
   <h1>📊 Global Rates Dashboard</h1>
 
+  <!-- 🔘 Navigation Buttons -->
+  <div class="buttons">
+    <a href="https://joneskys.github.io/jonny">📊 Dashboard</a>
+    <a href="https://joneskys.github.io/final">📊 Must Pick </a>
+    <a href="alert.html">🔔 Telegram Alerts</a>
+    <a href="https://cron-job.org">⚙️ Settings of Alerts</a>
+    
+  </div>
+
   <div class="grid">
     <div class="card">
       💵 USD → INR<br>
@@ -123,24 +156,20 @@ footer {
   </div>
 
   <footer>
-    Built by Solomon jones Kodidety 
+    Built by Solomon Jones Kodidety
   </footer>
 </div>
-
 
 <script>
 async function loadData() {
   try {
-    // USD to INR
     const forex = await fetch("https://open.er-api.com/v6/latest/USD");
     const forexData = await forex.json();
     const usdInr = forexData.rates.INR;
     document.getElementById("usdInr").innerText = usdInr.toFixed(2);
 
-    // Gold & Silver
     const metals = await fetch("https://data-asg.goldprice.org/dbXRates/USD");
     const metalsData = await metals.json();
-
     const gold = metalsData.items[0].xauPrice;
     const silver = metalsData.items[0].xagPrice;
 
@@ -153,20 +182,15 @@ async function loadData() {
     document.getElementById("goldInr").innerText = "₹" + goldInr.toFixed(2);
     document.getElementById("silverInr").innerText = "₹" + silverInr.toFixed(2);
 
-    // Update time
-    const now = new Date();
     document.getElementById("lastUpdated").innerText =
-      "Last updated: " + now.toLocaleTimeString();
+      "Last updated: " + new Date().toLocaleTimeString();
 
   } catch (e) {
     console.error("Error loading data", e);
   }
 }
 
-// Load immediately
 loadData();
-
-// Auto refresh every 60 seconds
 setInterval(loadData, 60000);
 </script>
 
