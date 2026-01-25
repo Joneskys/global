@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live Stock EMA Strategy</title>
+  <style>
+    body { font-family: Arial; background: #f5f7fa; padding: 20px; }
+    input, button { padding: 8px; margin: 5px; }
+    .box { background: #fff; padding: 15px; border-radius: 10px; margin-top: 15px; }
+    .green { color: green; font-weight: bold; }
+    .red { color: red; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<h2>📈 Live EMA Strategy + Backtest</h2>
+
+<input id="stock" placeholder="SBIN" />
+<input type="date" id="from">
+<input type="date" id="to">
+<button onclick="run()">Analyze</button>
+
+<div id="output" class="box">Waiting...</div>
+
+<script>
+const API = "https://red-tooth-e4f7.lovelyideas-in.workers.dev?symbol=";
+
+async function fetchData(symbol) {
+  const res = await fetch(API + symbol);
+  const json = await res.json();
+  return json.data || json; 
+}
+
+function ema(values, period) {
+  const k = 2 / (period + 1);
+  let ema = values[0];
+  let arr = [ema];
+  for (let i = 1; i < values.length; i++) {
+    ema = values[i] * k + ema * (1 - k);
+    arr.push(ema);
+  }
+  return arr;
+}
+
+function filterByDate(data, from, to) {
+  if (!from && !to) return data;
+  return data.filter(d => {
+    const dt = new Date(d.date);
+    if (from && dt < new Date(from)) return false;
+    if (to && dt > new Date(to)) return false;
+    return true;
+  });
+}
+
+async function run() {
+  const stock = document.getElementById("stock").value.trim();
+  if (!stock) return alert("Enter stock name");
+
+  document.getElementById("output").innerText = "Loading...";
+
+  try {
+    let raw = await fetchData(stock);
+
+    // Expected format:
+    // [{ date, open, high, low, close, volume }]
+    let from = document.getElementById("from").value;
+    let to = document.getElementById("to").value;
+
+    let data = filterByDate(raw, from, to);
+
+    let closes = data.map(d => Number(d.close));
+    let volumes = data.map(d => Number(d.volume));
+
+    let ema9 = ema(closes, 9);
+    let ema21 = ema(closes, 21);
+
+    let trades = [];
+    let wins = 0;
+
+    for (let i = 21; i < closes.length - 1; i++) {
+      if (ema9[i-1] < ema21[i-1] && ema9[i] > ema21[i]) {
+        let entry = closes[i];
+        let sl = entry - (entry * 0.005);
+        let target = entry + (entry * 0.01);
+        let result = closes[i+1] >= target ? "WIN" : "LOSS";
+        if (result === "WIN") wins++;
+        trades.push({ entry, sl, target, result });
+      }
+    }
+
+    let trend = ema9.at(-1) > ema21.at(-1) ? "Bullish" : "Bearish";
+    let volumeStrength = volumes.at(-1) > volumes.at(-2) ? "High" : "Low";
+    let winRatio = trades.length ? ((wins / trades.length) * 100).toFixed(2) : 0;
+    let latest = trades.at(-1);
+
+    document.getElementById("output").innerHTML = `
+      <h3>${stock.toUpperCase()}</h3>
+      <p>Trend: <b>${trend}</b></p>
+      <p>Volume: <b>${volumeStrength}</b></p>
+      <p>Total Trades: ${trades.length}</p>
+      <p>Win Ratio: <b>${winRatio}%</b></p>
+
+      <h4>Latest Signal</h4>
+      ${latest ? `
+        Buy Zone: ₹${latest.entry.toFixed(2)}<br>
+        Stop Loss: ₹${latest.sl.toFixed(2)}<br>
+        Target: ₹${latest.target.toFixed(2)}
+      ` : "No signal"}
+    `;
+
+  } catch (e) {
+    document.getElementById("output").innerText = "API error or data format mismatch";
+    console.error(e);
+  }
+}
+</script>
+</body>
+</html>
