@@ -32,43 +32,45 @@
 
 <script>
 async function loadData() {
+  try {
+    // USD to INR (CORS allowed)
+    const forexRes = await fetch("https://open.er-api.com/v6/latest/USD");
+    const forexData = await forexRes.json();
+    const usdInr = forexData.rates.INR;
 
-  // 1. USD to INR
-  const forex = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=INR");
-  const forexData = await forex.json();
-  const usdInr = forexData.rates.INR;
+    document.getElementById("usdInr").innerText = usdInr.toFixed(2);
 
-  document.getElementById("usdInr").innerText = usdInr.toFixed(2);
+    // Gold, Silver, Copper (CORS allowed)
+    const metalsRes = await fetch("https://data-asg.goldprice.org/dbXRates/USD");
+    const metals = await metalsRes.json();
 
-  // 2. Metals prices (Gold, Silver, Copper)
-  const metals = await fetch("https://api.metals.live/v1/spot");
-  const metalsData = await metals.json();
+    const gold = metals.items[0].xauPrice;
+    const silver = metals.items[0].xagPrice;
+    const copper = metals.items[0].xcuPrice;
 
-  let gold = metalsData.find(m => m.metal === "gold").price;
-  let silver = metalsData.find(m => m.metal === "silver").price;
-  let copper = metalsData.find(m => m.metal === "copper").price;
+    document.getElementById("goldUsd").innerText = "$" + gold.toFixed(2);
+    document.getElementById("silverUsd").innerText = "$" + silver.toFixed(2);
+    document.getElementById("copperUsd").innerText = "$" + copper.toFixed(4);
 
-  document.getElementById("goldUsd").innerText = "$" + gold.toFixed(2);
-  document.getElementById("silverUsd").innerText = "$" + silver.toFixed(2);
-  document.getElementById("copperUsd").innerText = "$" + copper.toFixed(2);
+    // Conversions
+    const ounceToGram = 31.1035;
+    const ounceToKg = 0.0311035;
 
-  // Conversions
-  const ounceToGram = 31.1035;
-  const ounceToKg = 0.0311035;
+    const goldInrGram = (gold / ounceToGram) * usdInr;
+    const silverInrKg = (silver / ounceToKg) * usdInr;
+    const copperInrKg = (copper / ounceToKg) * usdInr;
 
-  let goldInrGram = (gold / ounceToGram) * usdInr;
-  let silverInrKg = (silver / ounceToKg) * usdInr;
-  let copperInrKg = (copper / ounceToKg) * usdInr;
+    document.getElementById("goldInr").innerText = "₹" + goldInrGram.toFixed(2);
+    document.getElementById("silverInr").innerText = "₹" + silverInrKg.toFixed(2);
+    document.getElementById("copperInr").innerText = "₹" + copperInrKg.toFixed(2);
 
-  document.getElementById("goldInr").innerText = "₹" + goldInrGram.toFixed(2);
-  document.getElementById("silverInr").innerText = "₹" + silverInrKg.toFixed(2);
-  document.getElementById("copperInr").innerText = "₹" + copperInrKg.toFixed(2);
+  } catch (err) {
+    console.error(err);
+    document.body.insertAdjacentHTML("beforeend", "<p style='color:red'>⚠ Failed to load data</p>");
+  }
 }
 
-// Load immediately
 loadData();
-
-// Refresh every 60 seconds
 setInterval(loadData, 60000);
 </script>
 
