@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<body>
+<script>
+const BOT_TOKEN = "8168507195:AAHXFWjfWqDZ4A4ZWnBIIsoc9wu2yp6uGmU";
+const CHAT_ID = "1652821502";
+
+async function sendAlert() {
+
+  // Fetch USD-INR
+  const forex = await fetch("https://open.er-api.com/v6/latest/USD");
+  const forexData = await forex.json();
+  const usdInr = forexData.rates.INR;
+
+  // Gold + Silver
+  const metals = await fetch("https://data-asg.goldprice.org/dbXRates/USD");
+  const metalsData = await metals.json();
+  const gold = metalsData.items[0].xauPrice;
+  const silver = metalsData.items[0].xagPrice;
+
+  const goldInr = (gold / 31.1035) * usdInr;
+  const silverInr = (silver / 0.0311035) * usdInr;
+
+  // Crude oil
+  const oil = await fetch("https://query1.finance.yahoo.com/v7/finance/quote?symbols=CL=F");
+  const oilData = await oil.json();
+  const oilUsd = oilData.quoteResponse.result[0].regularMarketPrice;
+  const oilInr = (oilUsd * usdInr) / 158.987;
+
+  // Message
+  const msg = `
+📊 Market Alert
+
+💵 USD/INR: ${usdInr.toFixed(2)}
+🪙 Gold: ₹${goldInr.toFixed(2)} / g
+🥈 Silver: ₹${silverInr.toFixed(2)} / kg
+🛢 Crude: ₹${oilInr.toFixed(2)} / liter
+`;
+
+  // Send to Telegram
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(msg)}`;
+  await fetch(url);
+
+  document.body.innerHTML = "Alert sent ✔";
+}
+
+sendAlert();
+</script>
+</body>
+</html>
