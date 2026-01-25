@@ -1,101 +1,172 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Global Rates Dashboard</title>
-  <style>
-    body { font-family: Arial; background:#0f172a; color:white; padding:20px; }
-    .card { background:#1e293b; padding:15px; border-radius:12px; margin:12px 0; }
-    h1 { color:#38bdf8; }
-    span { color:#22c55e; font-weight:bold; }
-    .sell { color:#f87171; font-weight:bold; }
-    .buy { color:#4ade80; font-weight:bold; }
-  </style>
+<title>Global Market Dashboard</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0f172a;
+  color: white;
+}
+
+.container {
+  max-width: 1000px;
+  margin: auto;
+  padding: 20px;
+}
+
+h1 {
+  text-align: center;
+  color: #38bdf8;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.card {
+  background: #1e293b;
+  padding: 15px;
+  border-radius: 14px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+}
+
+.value {
+  font-size: 20px;
+  color: #4ade80;
+  font-weight: bold;
+}
+
+.badge {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2563eb;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  z-index: 1000;
+}
+
+.status-panel {
+  position: fixed;
+  right: 10px;
+  bottom: 80px;
+  background: #020617;
+  border: 1px solid #1e293b;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.7;
+  max-width: 240px;
+}
+
+.status-panel span {
+  color: #4ade80;
+  font-weight: bold;
+}
+
+footer {
+  margin-top: 40px;
+  padding: 15px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 14px;
+  border-top: 1px solid #1e293b;
+}
+</style>
 </head>
+
 <body>
 
-<h1>📊 Global Rates Dashboard</h1>
+<div class="badge">⚡ Live Market Dashboard</div>
 
-<div class="card">💵 USD → INR: <span id="usdInr">Loading...</span></div>
+<div class="container">
+  <h1>📊 Global Rates Dashboard</h1>
 
-<div class="card">
-  🪙 Gold USD/oz: <span id="goldUsd">...</span><br>
-  🇮🇳 Gold INR/g: <span id="goldInr">...</span>
+  <div class="grid">
+    <div class="card">
+      💵 USD → INR<br>
+      <div class="value" id="usdInr">Loading...</div>
+    </div>
+
+    <div class="card">
+      🪙 Gold (USD / oz)<br>
+      <div class="value" id="goldUsd">...</div><br>
+      Gold (INR / gram)<br>
+      <div class="value" id="goldInr">...</div>
+    </div>
+
+    <div class="card">
+      🥈 Silver (USD / oz)<br>
+      <div class="value" id="silverUsd">...</div><br>
+      Silver (INR / Kg)<br>
+      <div class="value" id="silverInr">...</div>
+    </div>
+
+    <div class="card">
+      🛢 Crude Oil (USD / barrel)<br>
+      <div class="value" id="oilUsd">...</div><br>
+      Crude (INR / liter)<br>
+      <div class="value" id="oilInr">...</div>
+    </div>
+  </div>
+
+  <footer>
+    Built by Solomon | Powered by Open Web APIs
+  </footer>
 </div>
 
-<div class="card">
-  🥈 Silver USD/oz: <span id="silverUsd">...</span><br>
-  🇮🇳 Silver INR/kg: <span id="silverInr">...</span>
-</div>
-
-<div class="card">
-  🛢 Crude Oil USD/barrel: <span id="oilUsd">...</span><br>
-  🇮🇳 Crude Oil INR/liter: <span id="oilInr">...</span>
-</div>
-
-<div class="card">
-  📈 Indian Stocks (Live)<br><br>
-  TATAGOLD: <span id="tatagold"></span> (<span id="tatagoldSig"></span>)<br>
-  TATSILVER: <span id="tatsilver"></span> (<span id="tatsilverSig"></span>)<br>
-  HINDCOPPER: <span id="hindcopper"></span> (<span id="hindcopperSig"></span>)
+<div class="status-panel">
+  <strong>🚀 System Status</strong><br><br>
+  <span>✔</span> Live financial dashboard<br>
+  <span>✔</span> Gold, silver, crude, forex<br>
+  <span>✔</span> Telegram bot alerts<br>
+  <span>✔</span> Scheduled automation<br>
+  <span>✔</span> No server<br>
+  <span>✔</span> No backend<br>
+  <span>✔</span> 100% free stack
 </div>
 
 <script>
 async function loadData() {
   try {
-    // USD → INR
     const forex = await fetch("https://open.er-api.com/v6/latest/USD");
     const forexData = await forex.json();
     const usdInr = forexData.rates.INR;
     document.getElementById("usdInr").innerText = usdInr.toFixed(2);
 
-    // Metals
-    const metalsRes = await fetch("https://data-asg.goldprice.org/dbXRates/USD");
-    const metals = await metalsRes.json();
-    const gold = metals.items[0].xauPrice;
-    const silver = metals.items[0].xagPrice;
+    const metals = await fetch("https://data-asg.goldprice.org/dbXRates/USD");
+    const metalsData = await metals.json();
+    const gold = metalsData.items[0].xauPrice;
+    const silver = metalsData.items[0].xagPrice;
 
     document.getElementById("goldUsd").innerText = "$" + gold.toFixed(2);
     document.getElementById("silverUsd").innerText = "$" + silver.toFixed(2);
 
-    const goldInrGram = (gold / 31.1035) * usdInr;
-    const silverInrKg = (silver / 0.0311035) * usdInr;
+    const goldInr = (gold / 31.1035) * usdInr;
+    const silverInr = (silver / 0.0311035) * usdInr;
 
-    document.getElementById("goldInr").innerText = "₹" + goldInrGram.toFixed(2);
-    document.getElementById("silverInr").innerText = "₹" + silverInrKg.toFixed(2);
+    document.getElementById("goldInr").innerText = "₹" + goldInr.toFixed(2);
+    document.getElementById("silverInr").innerText = "₹" + silverInr.toFixed(2);
 
-    // Crude Oil (Yahoo Finance proxy)
-    const oilRes = await fetch("https://query1.finance.yahoo.com/v7/finance/quote?symbols=CL=F");
-    const oilData = await oilRes.json();
+    const oil = await fetch("https://query1.finance.yahoo.com/v7/finance/quote?symbols=CL=F");
+    const oilData = await oil.json();
     const oilUsd = oilData.quoteResponse.result[0].regularMarketPrice;
+
     document.getElementById("oilUsd").innerText = "$" + oilUsd.toFixed(2);
 
-    const oilInrLiter = (oilUsd * usdInr) / 158.987;
-    document.getElementById("oilInr").innerText = "₹" + oilInrLiter.toFixed(2);
-
-    // Stocks from Yahoo Finance NSE
-    await loadStock("TATAGOLD.NS", "tatagold", "tatagoldSig");
-    await loadStock("TATSILVER.NS", "tatsilver", "tatsilverSig");
-    await loadStock("HINDCOPPER.NS", "hindcopper", "hindcopperSig");
+    const oilInr = (oilUsd * usdInr) / 158.987;
+    document.getElementById("oilInr").innerText = "₹" + oilInr.toFixed(2);
 
   } catch (e) {
     console.error(e);
-  }
-}
-
-async function loadStock(symbol, priceId, sigId) {
-  const res = await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`);
-  const data = await res.json();
-  const stock = data.quoteResponse.result[0];
-
-  const price = stock.regularMarketPrice;
-  const prev = stock.regularMarketPreviousClose;
-
-  document.getElementById(priceId).innerText = "₹" + price.toFixed(2);
-
-  if (price > prev) {
-    document.getElementById(sigId).innerHTML = "<span class='buy'>BUY</span>";
-  } else {
-    document.getElementById(sigId).innerHTML = "<span class='sell'>SELL</span>";
   }
 }
 
