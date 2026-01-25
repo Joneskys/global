@@ -1,101 +1,76 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Global Market Dashboard</title>
-<style>
-body { background:#0b1220; color:#e5e7eb; font-family:Arial; }
-.card {
-  background:#111827; padding:20px; border-radius:16px;
-  max-width:950px; margin:20px auto; box-shadow:0 0 25px black;
-}
-h2,h3 { margin-top:20px; }
-.stat { margin:8px 0; font-size:16px; }
-.green{color:#22c55e} .red{color:#ef4444}
-input,button {
-  background:#1f2937;color:white;border:none;padding:8px;border-radius:8px;
-}
-iframe{border-radius:12px}
-</style>
+  <title>Global Rates Dashboard</title>
+  <style>
+    body { font-family: Arial; background:#0f172a; color:white; padding:20px; }
+    .card { background:#1e293b; padding:15px; border-radius:12px; margin:10px 0; }
+    h1 { color:#38bdf8; }
+    span { color:#22c55e; font-weight:bold; }
+  </style>
 </head>
 <body>
 
+<h1>📊 Global Rates Dashboard</h1>
+
+<div class="card">💵 USD → INR: <span id="usdInr">Loading...</span></div>
+
 <div class="card">
-<h2>🌍 Global Market Dashboard</h2>
+  🪙 Gold (USD / ounce): <span id="goldUsd">Loading...</span><br>
+  🇮🇳 Gold (INR / gram): <span id="goldInr">Loading...</span>
+</div>
 
-<div id="usd" class="stat"></div>
-<div id="gold" class="stat"></div>
-<div id="silver" class="stat"></div>
-<div id="copper" class="stat"></div>
-<div id="crude" class="stat"></div>
+<div class="card">
+  🥈 Silver (USD / ounce): <span id="silverUsd">Loading...</span><br>
+  🇮🇳 Silver (INR / Kg): <span id="silverInr">Loading...</span>
+</div>
 
-<h3>📈 Gold Chart</h3>
-<iframe src="https://s.tradingview.com/widgetembed/?symbol=OANDA:XAUUSD&interval=60&theme=dark" width="100%" height="250"></iframe>
-
-<h3>📊 USDINR Chart</h3>
-<iframe src="https://s.tradingview.com/widgetembed/?symbol=FX_IDC:USDINR&interval=60&theme=dark" width="100%" height="250"></iframe>
-
-<h3>🔔 Gold Price Alert</h3>
-<input id="alertPrice" placeholder="Enter Gold price USD/oz">
-<button onclick="setAlert()">Set Alert</button>
-<div id="alertStatus"></div>
-
-<h3>🇮🇳 Indian ETFs / Stocks</h3>
-<div id="stocks"></div>
-
-<h3>📲 Telegram Bot Alerts</h3>
-<p>Telegram API format:</p>
-<code>https://api.telegram.org/botBOT_TOKEN/sendMessage?chat_id=CHAT_ID&text=YourMessage</code>
-<p>Use cron-job.org or Windows Task Scheduler at 9am, 1pm, 5pm.</p>
+<div class="card">
+  🟫 Copper (USD / ounce): <span id="copperUsd">Loading...</span><br>
+  🇮🇳 Copper (INR / Kg): <span id="copperInr">Loading...</span>
 </div>
 
 <script>
-let usd=0, gold=0;
+async function loadData() {
 
-async function loadData(){
-  const fx = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=INR").then(r=>r.json());
-  usd = fx.rates.INR;
+  // 1. USD to INR
+  const forex = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=INR");
+  const forexData = await forex.json();
+  const usdInr = forexData.rates.INR;
 
-  const metals = await fetch("https://api.metals.live/v1/spot").then(r=>r.json());
+  document.getElementById("usdInr").innerText = usdInr.toFixed(2);
 
-  gold = metals.gold;
-  let silver = metals.silver;
-  let copper = metals.copper;
-  let crude = metals.oil;
+  // 2. Metals prices (Gold, Silver, Copper)
+  const metals = await fetch("https://api.metals.live/v1/spot");
+  const metalsData = await metals.json();
 
-  document.getElementById("usd").innerHTML = `💱 USD → INR: <b>${usd.toFixed(2)}</b>`;
-  document.getElementById("gold").innerHTML = `🥇 Gold: $${gold} /oz → ₹${((gold*usd)/31.103).toFixed(2)} per gram`;
-  document.getElementById("silver").innerHTML = `🪙 Silver: $${silver} /oz → ₹${((silver*usd)/31.103).toFixed(2)} per gram`;
-  document.getElementById("copper").innerHTML = `🔩 Copper: $${copper} /oz → ₹${((copper*usd)/31.103).toFixed(2)} per gram`;
-  document.getElementById("crude").innerHTML = `🛢️ Crude: $${crude}/barrel → ₹${((crude*usd)/159).toFixed(2)} per litre`;
+  let gold = metalsData.find(m => m.metal === "gold").price;
+  let silver = metalsData.find(m => m.metal === "silver").price;
+  let copper = metalsData.find(m => m.metal === "copper").price;
 
-  loadStocks();
+  document.getElementById("goldUsd").innerText = "$" + gold.toFixed(2);
+  document.getElementById("silverUsd").innerText = "$" + silver.toFixed(2);
+  document.getElementById("copperUsd").innerText = "$" + copper.toFixed(2);
+
+  // Conversions
+  const ounceToGram = 31.1035;
+  const ounceToKg = 0.0311035;
+
+  let goldInrGram = (gold / ounceToGram) * usdInr;
+  let silverInrKg = (silver / ounceToKg) * usdInr;
+  let copperInrKg = (copper / ounceToKg) * usdInr;
+
+  document.getElementById("goldInr").innerText = "₹" + goldInrGram.toFixed(2);
+  document.getElementById("silverInr").innerText = "₹" + silverInrKg.toFixed(2);
+  document.getElementById("copperInr").innerText = "₹" + copperInrKg.toFixed(2);
 }
 
-async function loadStocks(){
-  const symbols=["TATAGOLD.NS","TATSILV.NS","HINDCOPPER.NS"];
-  const url=`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(",")}`;
-  const data=await fetch(url).then(r=>r.json());
-
-  let html="";
-  data.quoteResponse.result.forEach(s=>{
-    let fair = ((gold*usd)/31.103).toFixed(0);
-    let suggestion = s.regularMarketPrice < fair ? "<span class='green'>BUY</span>" : "<span class='red'>SELL</span>";
-    html+=`${s.symbol.replace(".NS","")} : ₹${s.regularMarketPrice} → ${suggestion}<br>`;
-  });
-  document.getElementById("stocks").innerHTML=html;
-}
-
-function setAlert(){
-  let target=parseFloat(document.getElementById("alertPrice").value);
-  document.getElementById("alertStatus").innerText="Alert running...";
-  setInterval(()=>{
-    if(gold>=target){ alert("Gold crossed "+target); }
-  },15000);
-}
-
+// Load immediately
 loadData();
-setInterval(loadData,60000);
+
+// Refresh every 60 seconds
+setInterval(loadData, 60000);
 </script>
+
 </body>
 </html>
