@@ -125,7 +125,7 @@ footer {
   <div class="buttons">
     <a href="https://joneskys.github.io/jonny" target="_blank">📊 Dashboard</a>
     <a href="https://joneskys.github.io/final" target="_blank">✍🏻Must Pick </a>
-    <a href="https://cron-job.org" target="_blank">🧐 Stock Analysis </a>
+    <a href="https://https://joneskys.github.io/global/analysis.html" target="_blank">🧐 Stock Analysis </a>
     <a href="alert.html" target="_blank">🔔 Telegram Alerts</a>
     <a href="https://cron-job.org" target="_blank">⚙️ Settings of Alerts</a>
     
@@ -164,18 +164,22 @@ footer {
 <script>
 async function loadData() {
   try {
+    const today = new Date().toISOString().split("T")[0];
+
+    // ---------- FOREX ----------
     const forex = await fetch("https://open.er-api.com/v6/latest/USD");
     const forexData = await forex.json();
     const usdInr = forexData.rates.INR;
     document.getElementById("usdInr").innerText = usdInr.toFixed(2);
 
+    // ---------- METALS ----------
     const metals = await fetch("https://data-asg.goldprice.org/dbXRates/USD");
     const metalsData = await metals.json();
     const gold = metalsData.items[0].xauPrice;
     const silver = metalsData.items[0].xagPrice;
 
-    document.getElementById("goldUsd").innerText = "$" + gold.toFixed(2);
-    document.getElementById("silverUsd").innerText = "$" + silver.toFixed(2);
+    updateAsset("gold", gold, "goldUsd");
+    updateAsset("silver", silver, "silverUsd");
 
     const goldInr = (gold / 31.1035) * usdInr;
     const silverInr = (silver / 0.0311035) * usdInr;
@@ -191,9 +195,51 @@ async function loadData() {
   }
 }
 
+// ---------- LOGIC FOR % CHANGE + HIGH LOW ----------
+function updateAsset(key, price, elementId) {
+  const today = new Date().toISOString().split("T")[0];
+
+  let data = JSON.parse(localStorage.getItem(key)) || {
+    date: today,
+    close: price,
+    high: price,
+    low: price,
+    yesterdayClose: price
+  };
+
+  // New day reset
+  if (data.date !== today) {
+    data.yesterdayClose = data.close;
+    data.date = today;
+    data.high = price;
+    data.low = price;
+  }
+
+  // Update high low
+  data.high = Math.max(data.high, price);
+  data.low = Math.min(data.low, price);
+  data.close = price;
+
+  localStorage.setItem(key, JSON.stringify(data));
+
+  const percent = ((price - data.yesterdayClose) / data.yesterdayClose) * 100;
+  const color = percent >= 0 ? "#4ade80" : "#f87171";
+
+  document.getElementById(elementId).innerHTML = `
+    $${price.toFixed(2)}
+    <div style="font-size:13px;color:${color}">
+      ${percent.toFixed(2)}%
+    </div>
+    <div style="font-size:12px;color:#94a3b8">
+      H: ${data.high.toFixed(2)} | L: ${data.low.toFixed(2)}
+    </div>
+  `;
+}
+
 loadData();
 setInterval(loadData, 60000);
 </script>
+
 
 </body>
 </html>
