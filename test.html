@@ -1,245 +1,160 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Global Market Dashboard</title>
+<meta charset="UTF-8">
+<title>NSE Pace Dashboard (LIVE)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #0f172a;
-  color: white;
-}
-
-.container {
-  max-width: 1000px;
-  margin: auto;
-  padding: 20px;
-}
-
-h1 {
-  text-align: center;
-  color: #38bdf8;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 15px;
-  margin-top: 20px;
-}
-
-.card {
-  background: #1e293b;
-  padding: 15px;
-  border-radius: 14px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-}
-
-.value {
-  font-size: 20px;
-  color: #4ade80;
-  font-weight: bold;
-}
-
-.badge {
-  position: fixed;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #2563eb;
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-size: 14px;
-  z-index: 1000;
-}
-
-/* 🔘 Buttons */
-.buttons {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  margin: 20px 0;
-  flex-wrap: wrap;
-}
-
-.buttons a {
-  text-decoration: none;
-  background: #2563eb;
-  color: white;
-  padding: 10px 18px;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: bold;
-  transition: 0.2s;
-}
-
-.buttons a:hover {
-  background: #1d4ed8;
-}
-
-.status-panel {
-  position: fixed;
-  right: 10px;
-  bottom: 80px;
-  background: #020617;
-  border: 1px solid #1e293b;
-  padding: 12px;
-  border-radius: 12px;
-  font-size: 13px;
-  line-height: 1.7;
-  max-width: 240px;
-}
-
-.status-panel span {
-  color: #4ade80;
-  font-weight: bold;
-}
-
-footer {
-  margin-top: 30px;
-  padding: 15px;
-  text-align: center;
-  color: #94a3b8;
-  font-size: 14px;
-  border-top: 1px solid #1e293b;
-}
-
-.updated {
-  text-align: center;
-  margin-top: 10px;
-  font-size: 13px;
-  color: #94a3b8;
-}
+body{margin:0;background:#0f172a;color:#e5e7eb;font-family:Arial}
+.container{max-width:1200px;margin:auto;padding:20px}
+h1{color:#38bdf8}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:15px}
+.card{background:#020617;border-radius:10px;padding:15px}
+.fast{color:#22c55e;font-weight:bold}
+.slow{color:#f87171;font-weight:bold}
+ul{padding-left:18px}
+small{color:#94a3b8}
 </style>
 </head>
 
 <body>
-
-<div class="badge">⚡ Live Market Dashboard</div>
-
 <div class="container">
-  <h1>📊 Global Rates Dashboard</h1>
+<h1>⚡ NSE Pace Dashboard (LIVE)</h1>
+<small>5-min candles • Yahoo Finance Live</small>
 
-  <!-- 🔘 Navigation Buttons -->
-  <div class="buttons">
-    <a href="https://joneskys.github.io/jonny" target="_blank">📊 Dashboard</a>
-    <a href="https://joneskys.github.io/final" target="_blank">✍🏻Must Pick </a>
-    <a href="https://cron-job.org" target="_blank">🧐 Stock Analysis </a>
-    <a href="alert.html" target="_blank">🔔 Telegram Alerts</a>
-    <a href="https://cron-job.org" target="_blank">⚙️ Settings of Alerts</a>
-    
+<div class="grid">
+  <div class="card">
+    <h3>⚡ Pace Monitor (SBIN)</h3>
+    <div id="paceBox">Loading…</div>
   </div>
 
-  <div class="grid">
-    <div class="card">
-      💵 USD → INR<br>
-      <div class="value" id="usdInr">Loading...</div>
-    </div>
-
-    <div class="card">
-      🪙 Gold (USD / oz)<br>
-      <div class="value" id="goldUsd">...</div><br>
-      Gold (INR / gram)<br>
-      <div class="value" id="goldInr">...</div>
-    </div>
-
-    <div class="card">
-      🥈 Silver (USD / oz)<br>
-      <div class="value" id="silverUsd">...</div><br>
-      Silver (INR / Kg)<br>
-      <div class="value" id="silverInr">...</div>
-    </div>
+  <div class="card">
+    <h3>📊 Top FAST Stocks</h3>
+    <ul id="fastList"></ul>
   </div>
-
-  <div class="updated" id="lastUpdated">
-    Last updated: --
-  </div>
-
-  <footer>
-    Built by Solomon Jones Kodidety
-  </footer>
+</div>
 </div>
 
 <script>
-async function loadData() {
-  try {
-    const today = new Date().toISOString().split("T")[0];
+/* ============ TELEGRAM CONFIG ============ */
+const TELEGRAM_BOT_TOKEN = "PASTE_BOT_TOKEN";
+const TELEGRAM_CHAT_ID  = "PASTE_CHAT_ID";
 
-    // ---------- FOREX ----------
-    const forex = await fetch("https://open.er-api.com/v6/latest/USD");
-    const forexData = await forex.json();
-    const usdInr = forexData.rates.INR;
-    document.getElementById("usdInr").innerText = usdInr.toFixed(2);
-
-    // ---------- METALS ----------
-    const metals = await fetch("https://data-asg.goldprice.org/dbXRates/USD");
-    const metalsData = await metals.json();
-    const gold = metalsData.items[0].xauPrice;
-    const silver = metalsData.items[0].xagPrice;
-
-    updateAsset("gold", gold, "goldUsd");
-    updateAsset("silver", silver, "silverUsd");
-
-    const goldInr = (gold / 31.1035) * usdInr;
-    const silverInr = (silver / 0.0311035) * usdInr;
-
-    document.getElementById("goldInr").innerText = "₹" + goldInr.toFixed(2);
-    document.getElementById("silverInr").innerText = "₹" + silverInr.toFixed(2);
-
-    document.getElementById("lastUpdated").innerText =
-      "Last updated: " + new Date().toLocaleTimeString();
-
-  } catch (e) {
-    console.error("Error loading data", e);
-  }
+/* ============ TELEGRAM FUNCTION ============ */
+function sendTelegram(msg){
+  fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({chat_id:TELEGRAM_CHAT_ID,text:msg})
+  });
 }
 
-// ---------- LOGIC FOR % CHANGE + HIGH LOW ----------
-function updateAsset(key, price, elementId) {
-  const today = new Date().toISOString().split("T")[0];
+/* ============ PACE ENGINE ============ */
+function calcROC(c,p=5){
+  if(c.length<p+1) return 0;
+  return ((c.at(-1)-c.at(-p-1))/c.at(-p-1))*100;
+}
+function calcATR(h,l,c,p=14){
+  if(c.length<p+1) return 0;
+  let tr=0;
+  for(let i=c.length-p;i<c.length;i++){
+    tr+=Math.max(
+      h[i]-l[i],
+      Math.abs(h[i]-c[i-1]),
+      Math.abs(l[i]-c[i-1])
+    );
+  }
+  return tr/p;
+}
+function calcADX(h,l,p=14){
+  if(h.length<p) return 0;
+  let s=0;
+  for(let i=h.length-p;i<h.length;i++)
+    s+=Math.abs(h[i]-l[i]);
+  return s/p;
+}
+function volumePace(v,p=10){
+  if(v.length<p) return 0;
+  let avg=v.slice(-p).reduce((a,b)=>a+b)/p;
+  return (v.at(-1)/avg)*100;
+}
+function paceResult(d){
+  let roc=calcROC(d.close);
+  let atr=calcATR(d.high,d.low,d.close);
+  let adx=calcADX(d.high,d.low);
+  let vp=volumePace(d.volume);
+  let score=0;
+  if(roc>0.7) score++;
+  if(adx>25) score++;
+  if(vp>150) score++;
+  if(atr>d.avgATR) score++;
+  return {roc,adx,vp,fast:score>=3};
+}
 
-  let data = JSON.parse(localStorage.getItem(key)) || {
-    date: today,
-    close: price,
-    high: price,
-    low: price,
-    yesterdayClose: price
+/* ============ YAHOO LIVE FETCH ============ */
+async function fetchYahoo(symbol, interval="5m"){
+  const url=`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${interval}&range=1d`;
+  const r=await fetch(url);
+  const j=await r.json();
+  const q=j.chart.result[0];
+  return {
+    close:q.indicators.quote[0].close.filter(x=>x),
+    high:q.indicators.quote[0].high.filter(x=>x),
+    low:q.indicators.quote[0].low.filter(x=>x),
+    volume:q.indicators.quote[0].volume.filter(x=>x),
+    avgATR: (Math.max(...q.indicators.quote[0].high.slice(-20)) -
+             Math.min(...q.indicators.quote[0].low.slice(-20))) / 2
   };
-
-  // New day reset
-  if (data.date !== today) {
-    data.yesterdayClose = data.close;
-    data.date = today;
-    data.high = price;
-    data.low = price;
-  }
-
-  // Update high low
-  data.high = Math.max(data.high, price);
-  data.low = Math.min(data.low, price);
-  data.close = price;
-
-  localStorage.setItem(key, JSON.stringify(data));
-
-  const percent = ((price - data.yesterdayClose) / data.yesterdayClose) * 100;
-  const color = percent >= 0 ? "#4ade80" : "#f87171";
-
-  document.getElementById(elementId).innerHTML = `
-    $${price.toFixed(2)}
-    <div style="font-size:13px;color:${color}">
-      ${percent.toFixed(2)}%
-    </div>
-    <div style="font-size:12px;color:#94a3b8">
-      H: ${data.high.toFixed(2)} | L: ${data.low.toFixed(2)}
-    </div>
-  `;
 }
 
-loadData();
-setInterval(loadData, 60000);
+/* ============ SYMBOLS (Yahoo) ============ */
+const symbols={
+  "SBIN":"SBIN.NS",
+  "RELIANCE":"RELIANCE.NS",
+  "BANKNIFTY":"^NSEBANK"
+};
+
+/* ============ MAIN LOGIC ============ */
+async function run(){
+  let fastHTML="";
+  for(let s in symbols){
+    try{
+      let data=await fetchYahoo(symbols[s]);
+      let p=paceResult(data);
+
+      if(s==="SBIN"){
+        document.getElementById("paceBox").innerHTML=`
+        ROC: ${p.roc.toFixed(2)}%<br>
+        ADX: ${p.adx.toFixed(1)}<br>
+        VOL PACE: ${p.vp.toFixed(0)}%<br>
+        <b class="${p.fast?'fast':'slow'}">
+        ${p.fast?'⚡ FAST':'🐢 SLOW'}
+        </b>`;
+      }
+
+      if(p.fast){
+        fastHTML+=`<li>⚡ ${s} | ROC ${p.roc.toFixed(1)}%</li>`;
+
+        if(p.roc>0.7 && p.adx>25 && p.vp>150){
+          sendTelegram(
+`⚡ STOCK PACE ALERT
+${s}
+ROC: ${p.roc.toFixed(2)}%
+ADX: ${p.adx.toFixed(1)}
+VOL: ${p.vp.toFixed(0)}%`
+          );
+        }
+      }
+    }catch(e){
+      console.log("Error:",s,e);
+    }
+  }
+  document.getElementById("fastList").innerHTML=
+    fastHTML || "<li>No FAST stocks</li>";
+}
+
+run();
 </script>
-
-
 </body>
 </html>
