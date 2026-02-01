@@ -1,163 +1,53 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <title>Audio Automation Control</title>
-
 <style>
-body {
-  font-family: Arial, sans-serif;
-  background: #0f172a;
-  color: #ffffff;
-  padding: 15px;
-}
-
-h2, h3 {
-  color: #38bdf8;
-}
-
-.card {
-  background: #020617;
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 15px;
-}
-
-button, select, input {
-  padding: 8px;
-  margin: 4px;
-  border-radius: 4px;
-  border: none;
-}
-
-button {
-  background: #2563eb;
-  color: white;
-  cursor: pointer;
-}
-
-button.red {
-  background: #dc2626;
-}
-
-button.gray {
-  background: #475569;
-}
-
-input, select {
-  background: #1e293b;
-  color: white;
-}
-
-table {
-  border-collapse: collapse;
-  width: 100%;
-}
-
-td, th {
-  border: 1px solid #334155;
-  padding: 5px;
-  text-align: center;
-}
-
-#status {
-  margin-top: 10px;
-  color: #22c55e;
-  font-weight: bold;
-}
+body { font-family: Arial; background:#0f172a; color:white; padding:20px }
+button, select, input { padding:8px; margin:5px }
+.card { background:#020617; padding:15px; margin-bottom:15px; border-radius:8px }
 </style>
 </head>
-
 <body>
 
 <h2>🔊 Audio Automation Control</h2>
 
-<!-- BASE VOLUME -->
 <div class="card">
-  <h3>Base Volume</h3>
-  <select id="baseVol"></select>
-  <button onclick="setBaseVol()">Save</button>
+Base Volume:
+<select id="vol"></select>
+<button onclick="setVol()">Save</button>
 </div>
 
-<!-- PLAYER CONTROLS -->
 <div class="card">
-  <h3>Playback Controls</h3>
-  <button class="gray" onclick="send('/prev')">⏮ Prev</button>
-  <button onclick="send('/pause')">⏸ Pause</button>
-  <button onclick="send('/playresume')">▶ Resume</button>
-  <button class="gray" onclick="send('/next')">⏭ Next</button>
+<button onclick="mute(1)">Mute</button>
+<button onclick="mute(0)">Unmute</button>
 </div>
 
-<!-- PLAY SPECIFIC SONG -->
 <div class="card">
-  <h3>Play Song</h3>
-  Folder:
-  <input id="folder" type="number" min="1" max="99">
-  File:
-  <input id="file" type="number" min="1" max="255">
-  <button onclick="playSong()">Play</button>
+Folder <input id="f" type="number">
+File <input id="n" type="number">
+<button onclick="play()">Play</button>
 </div>
 
-<!-- HOURLY VOLUME -->
-<div class="card">
-  <h3>Hourly Volume Schedule</h3>
-  <table>
-    <tr><th>Hour</th><th>Volume</th></tr>
-    <tbody id="hourlyTable"></tbody>
-  </table>
-  <button onclick="saveHourly()">Save Hourly Schedule</button>
-</div>
-
-<p id="status">Ready.</p>
+<p id="msg"></p>
 
 <script>
-/* ========= CONFIG ========= */
-// If hosting on another server, put NodeMCU IP here
-// Example: const BASE = "http://192.168.1.50";
-const BASE = "http://lovelyideas.pythonanywhere.com";
+const API = "https://lovelyideas.pythonanywhere.com/audio";
 
-/* ========= INIT ========= */
-for (let i = 0; i <= 30; i++) {
-  baseVol.innerHTML += `<option>${i}</option>`;
+for (let i=0;i<=30;i++) vol.innerHTML += `<option>${i}</option>`;
+
+function post(data){
+ fetch(API,{
+  method:"POST",
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify(data)
+ }).then(()=>msg.innerText="Command sent");
 }
 
-for (let h = 0; h < 24; h++) {
-  let row = `<tr>
-    <td>${h}:00</td>
-    <td>
-      <select id="h${h}">
-        ${[...Array(31).keys()].map(v => `<option>${v}</option>`).join("")}
-      </select>
-    </td>
-  </tr>`;
-  hourlyTable.innerHTML += row;
-}
-
-/* ========= HELPERS ========= */
-function send(url) {
-  fetch(BASE + url)
-    .then(r => r.text())
-    .then(t => status.innerText = t)
-    .catch(() => status.innerText = "❌ Error");
-}
-
-function setBaseVol() {
-  send(`/basevol?v=${baseVol.value}`);
-}
-
-function playSong() {
-  let f = folder.value;
-  let n = file.value;
-  send(`/play?f=${f}&n=${n}`);
-}
-
-function saveHourly() {
-  let data = "";
-  for (let h = 0; h < 24; h++) {
-    data += `${h}:${document.getElementById("h"+h).value},`;
-  }
-  send(`/hourly?data=${data}`);
-}
+function setVol(){ post({volume:Number(vol.value)}); }
+function mute(v){ post({mute:v}); }
+function play(){ post({play:{folder:Number(f.value),file:Number(n.value)}}); }
 </script>
 
 </body>
