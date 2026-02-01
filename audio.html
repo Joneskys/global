@@ -1,53 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<title>Audio Automation</title>
-<style>
-body{font-family:Arial;background:#0f172a;color:white;padding:20px}
-button,select,input{padding:8px;margin:6px}
-.card{background:#020617;padding:15px;border-radius:8px}
-</style>
+  <title>Audio Automation Control</title>
 </head>
 <body>
+<h2>Audio Automation Control</h2>
 
-<h2>🔊 Audio Automation Control</h2>
-
-<div class="card">
 Volume:
-<select id="vol"></select>
-<button onclick="setVol()">Save</button>
-</div>
+<select id="vol">
+  <script>
+    for(let i=0;i<=30;i++)
+      document.write(`<option>${i}</option>`);
+  </script>
+</select>
+<button onclick="setVol()">Save</button><br><br>
 
-<div class="card">
 <button onclick="mute(1)">Mute</button>
-<button onclick="mute(0)">Unmute</button>
-</div>
+<button onclick="mute(0)">Unmute</button><br><br>
 
-<div class="card">
-Folder <input id="f" value="33">
-File <input id="n" value="2">
+Folder: <input id="f" value="33">
+File: <input id="s" value="1">
 <button onclick="play()">Play</button>
-</div>
-
-<p id="msg"></p>
 
 <script>
 const API = "https://lovelyideas.pythonanywhere.com/audio";
-for(let i=0;i<=30;i++) vol.innerHTML+=`<option>${i}</option>`;
 
-function post(data){
- fetch(API,{
-  method:"POST",
-  headers:{'Content-Type':'application/json'},
-  body:JSON.stringify(data)
- }).then(()=>msg.innerText="Command sent");
+function setVol(){
+  fetch(API,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({volume:+vol.value})
+  }).then(()=>alert("Volume set"));
 }
-
-function setVol(){ post({volume:Number(vol.value)}); }
-function mute(m){ post({mute:m}); }
-function play(){ post({play:{folder:Number(f.value),file:Number(n.value)}}); }
+function mute(m){
+  fetch(API,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({mute:m})
+  }).then(()=>alert(m?"Muted":"Unmuted"));
+}
+function play(){
+  fetch(API,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({play:{folder:+f.value,file:+s.value}})
+  }).then(()=>alert("Play sent"));
+}
 </script>
-
 </body>
 </html>
