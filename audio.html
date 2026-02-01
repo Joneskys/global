@@ -2,11 +2,11 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Audio Automation Control</title>
+<title>Audio Automation</title>
 <style>
-body { font-family: Arial; background:#0f172a; color:white; padding:20px }
-button, select, input { padding:8px; margin:5px }
-.card { background:#020617; padding:15px; margin-bottom:15px; border-radius:8px }
+body{font-family:Arial;background:#0f172a;color:white;padding:20px}
+button,select,input{padding:8px;margin:6px}
+.card{background:#020617;padding:15px;border-radius:8px}
 </style>
 </head>
 <body>
@@ -14,7 +14,7 @@ button, select, input { padding:8px; margin:5px }
 <h2>🔊 Audio Automation Control</h2>
 
 <div class="card">
-Base Volume:
+Volume:
 <select id="vol"></select>
 <button onclick="setVol()">Save</button>
 </div>
@@ -25,8 +25,8 @@ Base Volume:
 </div>
 
 <div class="card">
-Folder <input id="f" type="number">
-File <input id="n" type="number">
+Folder <input id="f">
+File <input id="n">
 <button onclick="play()">Play</button>
 </div>
 
@@ -34,19 +34,17 @@ File <input id="n" type="number">
 
 <script>
 const API = "https://lovelyideas.pythonanywhere.com/audio";
+for(let i=0;i<=30;i++) vol.innerHTML+=`<option>${i}</option>`;
 
-for (let i=0;i<=30;i++) vol.innerHTML += `<option>${i}</option>`;
-
-function post(data){
+function post(d){
  fetch(API,{
   method:"POST",
   headers:{'Content-Type':'application/json'},
-  body:JSON.stringify(data)
+  body:JSON.stringify(d)
  }).then(()=>msg.innerText="Command sent");
 }
-
 function setVol(){ post({volume:Number(vol.value)}); }
-function mute(v){ post({mute:v}); }
+function mute(m){ post({mute:m}); }
 function play(){ post({play:{folder:Number(f.value),file:Number(n.value)}}); }
 </script>
 
